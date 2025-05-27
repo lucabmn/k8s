@@ -1,124 +1,121 @@
-Okay, hier ist eine separate `README.md` speziell für den `scripts/` Unterordner, die sich nur auf das `install.sh` Skript und dessen Verwendung konzentriert, inklusive eines `wget`-Befehls zum Herunterladen.
+# 🚀 Kubernetes Node Setup Skript 🚀
 
----
+Willkommen im `scripts/` Verzeichnis! 🎉 Hier findest du unser magisches `install.sh`-Skript, das dir hilft, deine Kubernetes-Nodes super einfach vorzubereiten und zu initialisieren. Schluss mit stundenlangem manuellem Tippen! 💻✨
 
-# Kubernetes Node Setup Skript
+## 📚 Inhaltsverzeichnis
 
-Dieses Verzeichnis enthält das Bash-Skript `install.sh`, das zur automatisierten Vorbereitung und Initialisierung von Kubernetes-Nodes (Master und Worker) für einen On-Premise-Cluster dient.
+*   [🌟 Über das Skript](#-über-das-skript)
+*   [✅ Voraussetzungen](#-voraussetzungen)
+*   [🛠️ Verwendung des Skripts](#-verwendung-des-skripts)
+    *   [Schritt 1: Skript herunterladen ⬇️](#schritt-1-skript-herunterladen-)
+    *   [Schritt 2: Master Node vorbereiten und initialisieren 👑](#schritt-2-master-node-vorbereiten-und-initialisieren-)
+    *   [Schritt 3: Worker Nodes vorbereiten 👷](#schritt-3-worker-nodes-vorbereiten-)
+    *   [Schritt 4: Worker Nodes dem Cluster hinzufügen 🤝](#schritt-4-worker-nodes-dem-cluster-hinzufügen-)
+    *   [Schritt 5: `/etc/hosts` Konfiguration (WICHTIG!) 🗺️](#schritt-5-etchosts-konfiguration-wichtig-)
+    *   [Schritt 6: Cluster Status überprüfen 👀](#schritt-6-cluster-status-überprüfen-)
+*   [💡 Wichtige Hinweise](#-wichtige-hinweise)
+*   [❓ Fehlerbehebung](#-fehlerbehebung)
 
-## Inhaltsverzeichnis
+## 🌟 Über das Skript
 
-*   [Über das Skript](#über-das-skript)
-*   [Voraussetzungen](#voraussetzungen)
-*   [Verwendung des Skripts](#verwendung-des-skripts)
-    *   [Schritt 1: Skript herunterladen](#schritt-1-skript-herunterladen)
-    *   [Schritt 2: Master Node vorbereiten und initialisieren](#schritt-2-master-node-vorbereiten-und-initialisieren)
-    *   [Schritt 3: Worker Nodes vorbereiten](#schritt-3-worker-nodes-vorbereiten)
-    *   [Schritt 4: Worker Nodes dem Cluster hinzufügen](#schritt-4-worker-nodes-dem-cluster-hinzufügen)
-    *   [Schritt 5: `/etc/hosts` Konfiguration (WICHTIG!)](#schritt-5-etchosts-konfiguration-wichtig)
-    *   [Schritt 6: Cluster Status überprüfen](#schritt-6-cluster-status-überprüfen)
-*   [Wichtige Hinweise](#wichtige-hinweise)
-*   [Fehlerbehebung](#fehlerbehebung)
+Das `install.sh`-Skript ist dein persönlicher Assistent für die Kubernetes-Node-Einrichtung auf Debian/Ubuntu-Systemen! Es nimmt dir eine Menge Arbeit ab und kümmert sich um:
 
-## Über das Skript
+*   System-Updates und die Installation aller benötigten Pakete. 📦
+*   Das Deaktivieren von Swap (ganz wichtig für K8s!). 🚫
+*   Die Installation und Konfiguration von `containerd` als deine Container Runtime. 🐳
+*   Anpassungen an den Sysctl-Einstellungen für eine reibungslose Netzwerkkommunikation. 🌐
+*   Das Hinzufügen der offiziellen Kubernetes-Repositories. 🔗
+*   Die Installation von `kubelet`, `kubeadm` und `kubectl` – und pinnt deren Versionen, damit nichts versehentlich kaputt geht. 🔒
+*   Auf Master-Nodes: Die Initialisierung deiner Kubernetes Control Plane. 🎉
 
-Das `install.sh`-Skript automatisiert die initialen Konfigurationsschritte, um einen Server als Kubernetes-Node vorzubereiten. Es kümmert sich um:
+Das Beste daran? Das Skript ist interaktiv! Es fragt dich nach wichtigen Details wie dem Hostnamen deines Nodes, seiner Rolle (Master oder Worker) und dem Pod-Netzwerk-CIDR. So bleibt alles flexibel und auf deine Bedürfnisse zugeschnitten. 💬
 
-*   System-Updates und Installation notwendiger Pakete (`curl`, `apt-transport-https` etc.).
-*   Deaktivierung von Swap.
-*   Installation und Konfiguration von `containerd` als Container Runtime.
-*   Anpassung der Sysctl-Einstellungen (`br_netfilter`, `overlay`).
-*   Hinzufügen der offiziellen Kubernetes-Repositories.
-*   Installation und Versionen-Pinning von `kubelet`, `kubeadm` und `kubectl`.
-*   Auf Master-Nodes: Initialisierung des Kubernetes Control Planes.
+## ✅ Voraussetzungen
 
-Das Skript ist interaktiv und fragt nach dem Hostnamen des Nodes, seiner Rolle (Master/Worker) und dem gewünschten Pod-Netzwerk-CIDR.
+Bevor du loslegst, sorge bitte dafür, dass die folgenden Punkte erfüllt sind:
 
-## Voraussetzungen
+*   **Betriebssystem:** Debian oder Ubuntu (auf aktuellen Versionen getestet – je neuer, desto besser!). 🐧
+*   **Root-Rechte:** Du musst das Skript mit Root-Rechten ausführen (z.B. `sudo bash install.sh`). Denk dran: Große Power, große Verantwortung! 😉
+*   **Internetverbindung:** Dein Node braucht Zugang zum Internet, um alle nötigen Pakete und Container-Images herunterzuladen. 🚀
+*   **Netzwerkplanung:** Überlege dir vorher, welches Pod-Netzwerk-CIDR du für dein Cluster verwenden möchtest (z.B. `10.244.0.0/16` für Flannel). Dieses muss auf **allen** Nodes gleich sein! 🤝
 
-*   **Betriebssystem:** Debian oder Ubuntu (getestet mit aktuellen Versionen).
-*   **Root-Rechte:** Das Skript muss mit Root-Rechten ausgeführt werden (z.B. `sudo bash install.sh`).
-*   **Internetverbindung:** Der Node benötigt eine Internetverbindung, um Pakete und Container-Images herunterzuladen.
-*   **Netzwerkplanung:** Kennen Sie das Pod-Netzwerk-CIDR, das Sie für Ihr Cluster verwenden möchten (z.B. `10.244.0.0/16` für Flannel). Dieses muss auf allen Nodes konsistent sein.
+## 🛠️ Verwendung des Skripts
 
-## Verwendung des Skripts
+Folge diesen Schritten auf **jedem** deiner zukünftigen Kubernetes-Nodes (egal ob Master oder Worker), um sie startklar zu machen.
 
-Führen Sie die folgenden Schritte auf **jedem Ihrer Kubernetes-Nodes (Master und Worker)** aus.
+### Schritt 1: Skript herunterladen ⬇️
 
-### Schritt 1: Skript herunterladen
-
-Verwenden Sie `wget`, um das Skript direkt herunterzuladen:
+Zuerst holst du dir das Skript auf deinen Server. Erstelle ein Verzeichnis und lade es direkt per `wget` herunter:
 
 ```bash
 mkdir -p ~/k8s-setup && cd ~/k8s-setup
-wget https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/install.sh
+wget https://raw.githubusercontent.com/lucabmn/k8s/refs/heads/main/scripts/install.sh
 chmod +x install.sh
 ```
-*(Ersetzen Sie `IhrBenutzername` und `IhrRepoName` durch die tatsächlichen Werte Ihres GitHub-Repositorys.)*
+### Schritt 2: Master Node vorbereiten und initialisieren 👑
 
-### Schritt 2: Master Node vorbereiten und initialisieren
-
-Loggen Sie sich auf dem vorgesehenen Master Node (z.B. `k8s-master-01`) ein und starten Sie das Skript:
+Melde dich auf deinem vorgesehenen Master Node (z.B. `k8s-master-01`) an und starte das Skript:
 
 ```bash
 sudo bash install.sh
 ```
 
-**Während der Ausführung:**
+**Wenn das Skript dich fragt:**
 
-*   **Hostname:** Geben Sie den Hostnamen für Ihren Master Node ein (z.B. `k8s-master-01`).
-*   **Rolle:** Wählen Sie `1` für "Kubernetes Master Node".
-*   **Pod-Netzwerk-CIDR:** Geben Sie Ihr gewünschtes Pod-Netzwerk-CIDR ein (z.B. `10.244.0.0/16`). **Notieren Sie sich dieses CIDR**, da es auf allen Worker Nodes identisch sein muss.
+*   **Hostname:** Gib den coolen Hostnamen für deinen Master Node ein (z.B. `k8s-master-01`).
+*   **Rolle:** Wähle `1` für "Kubernetes Master Node". Deine Krone wartet! 👑
+*   **Pod-Netzwerk-CIDR:** Gib dein gewähltes Pod-Netzwerk-CIDR ein (z.B. `10.244.0.0/16`). **Ganz wichtig: Merk dir dieses CIDR gut!** Es muss auf allen Worker Nodes genau dasselbe sein. 📝
 
-Nachdem das Skript auf dem Master Node abgeschlossen ist, wird Ihnen eine wichtige Ausgabe angezeigt.
-**Beachten Sie insbesondere:**
+Nachdem das Skript auf dem Master Node seine Arbeit beendet hat, siehst du eine **sehr wichtige** Ausgabe.
+**Nimm dir einen Moment Zeit und beachte besonders:**
 
-*   **Der `kubeadm join`-Befehl:** Dieser Befehl wird verwendet, um Worker Nodes zum Cluster hinzuzufügen. Kopieren Sie ihn und speichern Sie ihn sicher.
-*   **Die Anweisungen zur `kubectl`-Konfiguration:** Führen Sie die drei `mkdir`, `cp`, und `chown`-Befehle aus, um `kubectl` für Ihren normalen Benutzer zugänglich zu machen.
-*   **Installation des Pod-Netzwerk-Addons:** Führen Sie den Befehl zum Installieren des Pod-Netzwerk-Addons (z.B. Flannel) auf dem **Master Node** aus. Beispiel für Flannel:
+*   **Der `kubeadm join`-Befehl:** Das ist der Zauberspruch, mit dem deine Worker Nodes später beitreten. Kopiere ihn und bewahre ihn sicher auf! ✨
+*   **Die `kubectl`-Konfiguration:** Führe die drei `mkdir`, `cp`, und `chown`-Befehle aus, damit du `kubectl` als normaler Benutzer nutzen kannst.
+*   **Installation des Pod-Netzwerk-Addons:** Das ist entscheidend für die Kommunikation deiner Pods. Führe den Befehl zum Installieren des Pod-Netzwerk-Addons (z.B. Flannel) auf dem **Master Node** aus. Beispiel für Flannel:
     ```bash
     kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
     ```
 
-### Schritt 3: Worker Nodes vorbereiten
+### Schritt 3: Worker Nodes vorbereiten 👷
 
-Loggen Sie sich auf jedem Worker Node (z.B. `k8s-worker-01`, `k8s-worker-02`) ein, wechseln Sie in das Verzeichnis mit dem Skript und starten Sie es:
+Melde dich auf jedem deiner Worker Nodes (z.B. `k8s-worker-01`, `k8s-worker-02`) an. Gehe in das Verzeichnis, in das du das Skript heruntergeladen hast, und starte es:
 
 ```bash
-cd ~/k8s-setup # Oder das Verzeichnis, in das Sie das Skript heruntergeladen haben
+cd ~/k8s-setup # Oder dein Download-Verzeichnis
 sudo bash install.sh
 ```
 
-**Während der Ausführung:**
+**Wenn das Skript dich fragt:**
 
-*   **Hostname:** Geben Sie den entsprechenden Hostnamen für den Worker Node ein (z.B. `k8s-worker-01` oder `k8s-worker-02`).
-*   **Rolle:** Wählen Sie `2` für "Kubernetes Worker Node".
-*   **Pod-Netzwerk-CIDR:** Geben Sie das **gleiche** Pod-Netzwerk-CIDR ein, das Sie für den Master Node verwendet haben (z.B. `10.244.0.0/16`).
+*   **Hostname:** Gib den passenden Hostnamen für deinen Worker Node ein (z.B. `k8s-worker-01` oder `k8s-worker-02`).
+*   **Rolle:** Wähle `2` für "Kubernetes Worker Node". Lass uns arbeiten! 👷
+*   **Pod-Netzwerk-CIDR:** Gib das **genau gleiche** Pod-Netzwerk-CIDR ein, das du für den Master Node verwendet hast (z.B. `10.244.0.0/16`). Konsistenz ist der Schlüssel! 🔑
 
-Das Skript bereitet nun den Worker Node vor. Am Ende wird es Sie darauf hinweisen, den `kubeadm join`-Befehl manuell auszuführen.
+Das Skript wird nun den Worker Node fleißig vorbereiten. Am Ende wird es dich daran erinnern, den `kubeadm join`-Befehl auszuführen.
 
-### Schritt 4: Worker Nodes dem Cluster hinzufügen
+### Schritt 4: Worker Nodes dem Cluster hinzufügen 🤝
 
-Führen Sie auf **jedem Worker Node** den `kubeadm join`-Befehl aus, den Sie aus der Ausgabe der Master-Node-Initialisierung kopiert haben.
+Gehe zurück zu jedem Worker Node und führe den `kubeadm join`-Befehl aus, den du aus der Master-Node-Initialisierung kopiert hast. Denk daran: Das ist der Moment, in dem sie dem Team beitreten!
 
 ```bash
 sudo <IHREN KUBEADM JOIN BEFEHL HIER EINFÜGEN>
 # Beispiel: sudo kubeadm join 192.168.1.100:6443 --token abcdef.0123456789abcdef --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxx
 ```
 
-### Schritt 5: `/etc/hosts` Konfiguration (WICHTIG!)
+### Schritt 5: `/etc/hosts` Konfiguration (WICHTIG!) 🗺️
 
-Damit die Nodes sich gegenseitig über ihre Hostnamen auflösen können, ist es **dringend empfohlen**, die `/etc/hosts`-Datei auf **allen Master- und Worker-Nodes** anzupassen. Dies ist für die interne Kommunikation und die Stabilität des Clusters wichtig.
+Damit deine Nodes sich gegenseitig mit ihren Namen verstehen und nicht nur mit schwer zu merkenden IPs, ist es **UNBEDINGT EMPFOHLEN**, die `/etc/hosts`-Datei auf **allen** Master- und Worker-Nodes anzupassen. Das ist super wichtig für eine stabile Kommunikation im Cluster! 🗣️
 
-Bearbeiten Sie die Datei auf jedem Node:
+Bearbeite die Datei auf jedem Node:
 ```bash
 sudo nano /etc/hosts
 ```
 
-Fügen Sie am Ende der Datei die IP-Adressen und Hostnamen **aller** Ihrer Cluster-Nodes hinzu (ersetzen Sie die Platzhalter durch Ihre tatsächlichen IPs):
+Füge am Ende der Datei die IP-Adressen und Hostnamen **aller** deiner Cluster-Nodes hinzu (ersetze die Platzhalter mit deinen tatsächlichen IPs):
 
 ```
 # Beispiel für /etc/hosts Einträge
+# So wissen deine Nodes, wer wer ist! 😉
 <IP_DES_K8S_MASTER_01>   k8s-master-01
 <IP_DES_K8S_WORKER_01>  k8s-worker-01
 <IP_DES_K8S_WORKER_02>  k8s-worker-02
@@ -126,33 +123,33 @@ Fügen Sie am Ende der Datei die IP-Adressen und Hostnamen **aller** Ihrer Clust
 
 Speichern und schließen Sie die Datei.
 
-### Schritt 6: Cluster Status überprüfen
+### Schritt 6: Cluster Status überprüfen 👀
 
-Sobald alle Worker Nodes beigetreten sind, gehen Sie zum Master Node und überprüfen Sie den Status Ihres Clusters:
+Sobald alle Worker Nodes beigetreten sind, gehe zurück zum Master Node. Es ist Zeit, deine brandneue Kubernetes-Umgebung zu bewundern! ✨
 
 ```bash
 kubectl get nodes
 kubectl get pods -A
 ```
-Alle Ihre Nodes sollten den Status `Ready` und alle wichtigen System-Pods den Status `Running` anzeigen.
+Alle deine Nodes sollten stolz den Status `Ready` anzeigen, und alle wichtigen System-Pods sollten fröhlich `Running` sein. Herzlichen Glückwunsch, dein Cluster ist live! 🎉🥳
 
-## Wichtige Hinweise
+## 💡 Wichtige Hinweise
 
-*   **Versions-Pinning:** Das Skript installiert Kubernetes-Komponenten und pinnt deren Versionen, um unbeabsichtigte Upgrades zu verhindern. Die Standardversion ist `v1.29`, kann aber im Skript angepasst werden.
-*   **Join-Token:** Der `kubeadm join`-Token, der vom Master generiert wird, ist standardmäßig nur 24 Stunden gültig. Falls er abläuft, können Sie auf dem Master einen neuen erzeugen mit: `sudo kubeadm token create --print-join-command`.
+*   **Versions-Pinning:** Das Skript ist schlau! Es installiert Kubernetes-Komponenten und "pinnt" deren Versionen. Das verhindert, dass unerwartete Updates dein Cluster durcheinanderbringen. Die Standardversion ist `v1.29`, aber du kannst sie im Skript anpassen, wenn du möchtest. 📏
+*   **Join-Token:** Der `kubeadm join`-Token, den der Master generiert, ist aus Sicherheitsgründen nur 24 Stunden gültig. Falls er abläuft, keine Panik! Du kannst auf dem Master ganz einfach einen neuen erstellen: `sudo kubeadm token create --print-join-command`. 👍
 
-## Fehlerbehebung
+## ❓ Fehlerbehebung
 
-*   **Skript bricht ab:** Lesen Sie die Fehlermeldungen sorgfältig. Oft fehlen Voraussetzungen oder Pakete konnten nicht installiert werden.
-*   **`kubeadm init` / `kubeadm join` Fehler:**
-    *   Stellen Sie sicher, dass Swap deaktiviert ist (`sudo swapoff -a`).
-    *   Überprüfen Sie, ob `containerd` läuft und korrekt konfiguriert ist (`sudo systemctl status containerd`).
-    *   Überprüfen Sie die Sysctl-Einstellungen (`sudo sysctl --system`).
-    *   Wenn ein Node in einem inkonsistenten Zustand ist, kann `sudo kubeadm reset` helfen, ihn zurückzusetzen, bevor Sie das Skript erneut ausführen.
-*   **Nodes `NotReady`:**
-    *   Überprüfen Sie die Pods im `kube-system` Namespace auf dem Master (`kubectl get pods -n kube-system`).
-    *   Vergewissern Sie sich, dass Ihr Pod-Netzwerk-Addon (z.B. Flannel) richtig installiert ist und seine Pods laufen.
-    *   Schauen Sie in die Logs von `kubelet` auf dem betreffenden Node: `sudo journalctl -u kubelet -f`.
-    *   Prüfen Sie Ihre Firewall-Einstellungen (wenn vorhanden) und die `/etc/hosts` Konfiguration.
+Manchmal läuft nicht alles perfekt – das ist normal! Hier sind ein paar Tipps, wenn du auf Probleme stößt:
 
----
+*   **Skript bricht ab:** Lies die Fehlermeldungen genau! Oft sind es fehlende Voraussetzungen oder Probleme beim Download von Paketen.
+*   **`kubeadm init` / `kubeadm join` schlagen fehl:**
+    *   Hast du wirklich Swap deaktiviert? Überprüfe mit `sudo swapoff -a`. 🚫
+    *   Läuft `containerd` ordnungsgemäß und ist es korrekt konfiguriert? (`sudo systemctl status containerd`). 🐳
+    *   Sind die Sysctl-Einstellungen korrekt angewendet? (`sudo sysctl --system`).
+    *   Wenn ein Node in einem seltsamen Zustand ist und du neu anfangen möchtest, kann `sudo kubeadm reset` helfen, ihn komplett zurückzusetzen.
+*   **Nodes bleiben im Status `NotReady`:**
+    *   Schau dir die Pods im `kube-system` Namespace auf dem Master an: `kubectl get pods -n kube-system`.
+    *   Ist dein Pod-Netzwerk-Addon (wie Flannel) richtig installiert und laufen seine Pods? 🤔
+    *   Wirf einen Blick in die Logs von `kubelet` auf dem betreffenden Node: `sudo journalctl -u kubelet -f`.
+    *   Überprüfe deine Firewall-Regeln (falls vorhanden) und stelle sicher, dass die `/etc/hosts`-Datei auf allen Nodes perfekt ist. 🔥
