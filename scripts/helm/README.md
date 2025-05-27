@@ -1,7 +1,3 @@
-Absolut! Hier ist die README für den `scripts/helm/` Unterordner, die dein neues Helm-Installationsskript dokumentiert, inklusive Emojis und dem korrekten Pfad.
-
----
-
 # ⚓ Helm Installation Skript ⚓
 
 Dieses Verzeichnis enthält das Bash-Skript `install.sh`, das dir hilft, Helm auf deinem Kubernetes-Node zu installieren und für eine reibungslose Nutzung vorzubereiten. 🚀

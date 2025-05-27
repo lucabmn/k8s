@@ -1,7 +1,3 @@
-Absolut! Hier ist die aktualisierte README für den `scripts/nginx-controller/` Ordner, die den `wget`-Befehl mit dem korrekten GitHub-Pfad enthält.
-
----
-
 # 🌐 NGINX Ingress Controller Installation Skript 🌐
 
 Willkommen in diesem Verzeichnis! Hier findest du das `install.sh`-Skript, das dir den Weg zum Laufen des NGINX Ingress Controllers in deinem Kubernetes-Cluster ebnet. Mach dich bereit, deinen Service-Traffic elegant zu leiten! 🚦✨
