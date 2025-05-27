@@ -1,4 +1,4 @@
-Okay, hier ist die README-Datei für den neuen `scripts/nginx-controller/` Ordner, die alle wichtigen Informationen zum Installationsskript enthält, inklusive des spezifischen Pfades und den Server-Anforderungen, und das alles mit einem freundlichen Touch und Emojis! 😃
+Absolut! Hier ist die aktualisierte README für den `scripts/nginx-controller/` Ordner, die den `wget`-Befehl mit dem korrekten GitHub-Pfad enthält.
 
 ---
 
@@ -32,7 +32,7 @@ Das `install.sh`-Skript in diesem Ordner ist dein Helfer, um den NGINX Ingress C
 Bevor du dieses Skript startest, vergewissere dich, dass die folgenden Punkte erfüllt sind:
 
 *   **Laufendes Kubernetes-Cluster:** Dein Kubernetes-Cluster (Master & Worker Nodes) sollte bereits betriebsbereit sein.
-*   **Helm installiert:** Helm muss auf dem Server, auf dem du dieses Skript ausführst, installiert und konfiguriert sein. **Dieses Skript wird mit einem Fehler abbrechen, wenn Helm nicht gefunden wird!** Siehe `/scripts/helm/install.sh` für die Installation von Helm. ⚓
+*   **Helm installiert:** Helm muss auf dem Server, auf dem du dieses Skript ausführst, installiert und konfiguriert sein. **Dieses Skript wird mit einem Fehler abbrechen, wenn Helm nicht gefunden wird!** Siehe die `README.md` im `/scripts/helm/` Ordner für die Installation von Helm. ⚓
 *   **Root-Rechte:** Das Skript muss mit `sudo` ausgeführt werden.
 *   **Internetverbindung:** Der Server benötigt Internetzugang, um Helm Charts herunterzuladen. 🌐
 
@@ -49,13 +49,14 @@ Folge diesen einfachen Schritten, um deinen NGINX Ingress Controller zu installi
 
 ### Schritt 1: Skript herunterladen ⬇️
 
-Navigiere auf deinem vorgesehenen Server (wahrscheinlich dem Master Node) zu einem geeigneten Verzeichnis und lade das Skript herunter. Wenn du das Haupt-Repository geklont hast, ist es bereits an Ort und Stelle:
+Navigiere auf deinem vorgesehenen Server (wahrscheinlich dem Master Node) zu einem geeigneten Verzeichnis und lade das Skript herunter:
 
 ```bash
-cd IhrRepoName/scripts/nginx-controller/ # Oder dorthin, wo das Skript liegt
+mkdir -p ~/nginx-ingress-setup && cd ~/nginx-ingress-setup
+wget https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/nginx-controller/install.sh
 chmod +x install.sh
 ```
-*(Stelle sicher, dass `IhrRepoName` durch den tatsächlichen Namen deines geklonten GitHub-Repositorys ersetzt wird!)*
+*(Stelle sicher, dass du dich in einem Verzeichnis befindest, in dem du Schreibrechte hast, z.B. in deinem Home-Verzeichnis.)*
 
 ### Schritt 2: Skript ausführen ▶️
 
@@ -92,5 +93,3 @@ Das Skript wird nun prüfen, ob Helm vorhanden ist, das NGINX Ingress Controller
     *   Stelle sicher, dass dein Cluster gesund ist (`kubectl get nodes`, `kubectl get pods -A`).
     *   Überprüfe die Logs der Ingress-Controller-Pods: `kubectl logs -f <POD_NAME> -n ingress-nginx`.
     *   Manchmal hilft ein `helm uninstall ingress-nginx --namespace ingress-nginx` und ein erneuter Versuch.
-
-Viel Erfolg beim Steuern deines Kubernetes-Traffics! 🚀🚦
