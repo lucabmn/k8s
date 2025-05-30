@@ -1,47 +1,50 @@
-# 🌐 NGINX Ingress Controller
+# 🌐 NGINX Ingress Controller Installation
 
-Ein einfaches Skript zur Installation des NGINX Ingress Controllers in einem Kubernetes Cluster.
+Dieses Skript installiert den NGINX Ingress Controller in deinem Kubernetes Cluster.
 
-## 📋 Schnellstart
+## 🚀 Schnellstart
 
-1. **Skript herunterladen und ausführen:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/nginx-controller/install.sh -o install.sh && chmod +x install.sh && sudo ./install.sh
+curl -sSL https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/nginx-controller/install.sh -o install.sh
+chmod +x install.sh
+sudo ./install.sh
 ```
 
-## ⚙️ Voraussetzungen
+## 📋 Voraussetzungen
 
-- Laufendes Kubernetes Cluster
-- Helm installiert
+- Kubernetes Cluster
+- Helm (v3.x)
 - Root-Rechte
 - Internetverbindung
 
-## 🔧 Installation
+## 🛠️ Installation
 
-Das Skript:
-1. Prüft ob Helm installiert ist
-2. Fügt das NGINX Ingress Repository hinzu
-3. Erstellt den ingress-nginx Namespace
-4. Installiert den Ingress Controller mit NodePort
+Das Skript führt folgende Schritte aus:
 
-## 📊 Status prüfen
+1. Prüft auf existierende Installation
+2. Fügt das Helm Repository hinzu
+3. Aktualisiert die Helm Repositories
+4. Erstellt den benötigten Namespace
+5. Installiert den NGINX Ingress Controller
+
+## ✅ Überprüfung
+
+Nach der Installation kannst du den Status überprüfen mit:
 
 ```bash
-# Pods überprüfen
 kubectl get pods -n ingress-nginx
-
-# Services überprüfen
 kubectl get svc -n ingress-nginx
 ```
 
-## 🛠️ Fehlerbehebung
+## ⚠️ Hinweise
 
-- **Helm nicht installiert:** 
-  ```bash
-  curl -sSL https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/helm/install.sh | sudo bash
-  ```
-- **Installation fehlgeschlagen:**
-  ```bash
-  helm uninstall ingress-nginx --namespace ingress-nginx
-  ```
-  Dann Skript erneut ausführen
+- Der Ingress Controller wird als NodePort Service installiert
+- Die Installation kann einige Minuten dauern
+- Bei einer existierenden Installation wird gefragt, ob diese entfernt werden soll
+
+## 🔧 Fehlerbehebung
+
+Falls die Installation fehlschlägt:
+1. Prüfe die Logs: `kubectl logs -n ingress-nginx`
+2. Stelle sicher, dass Helm korrekt installiert ist
+3. Überprüfe die Netzwerkverbindung
