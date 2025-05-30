@@ -1,0 +1,24 @@
+---
+- name: Download Helm installation script
+  get_url:
+    url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    dest: /tmp/get-helm-3
+    mode: '0755'
+
+- name: Install Helm
+  command: /tmp/get-helm-3
+  args:
+    creates: /usr/local/bin/helm
+
+- name: Clean up installation script
+  file:
+    path: /tmp/get-helm-3
+    state: absent
+
+- name: Add Helm repository
+  command: helm repo add stable https://charts.helm.sh/stable
+  changed_when: false
+
+- name: Update Helm repositories
+  command: helm repo update
+  changed_when: false 

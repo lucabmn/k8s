@@ -1,0 +1,21 @@
+---
+- name: Configure all nodes
+  hosts: all
+  become: true
+  roles:
+    - common
+
+- name: Configure Kubernetes master nodes
+  hosts: master
+  become: true
+  roles:
+    - kubernetes
+    - helm
+    - nginx-ingress
+    - argocd
+
+- name: Configure Kubernetes worker nodes
+  hosts: worker
+  become: true
+  roles:
+    - kubernetes 
