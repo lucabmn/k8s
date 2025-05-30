@@ -5,11 +5,150 @@ KUBERNETES_VERSION="v1.29" # Kann bei Bedarf geändert werden
 CONTAINERD_VERSION="1.7.13" # Aktuelle containerd Version, kann angepasst werden
 
 # Default Werte
-DEFAULT_HOSTNAME="k8s-master-01"
+DEFAULT_HOSTNAME=$(hostname) # Aktueller Hostname des Servers
 DEFAULT_NODE_ROLE="1"
 DEFAULT_POD_CIDR="10.50.0.0/16"
+CLUSTER_INFO_FILE="cluster-info.txt"
+
+# Farben für die Ausgabe
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+BOLD='\033[1m'
 
 # --- Funktionen ---
+
+# Funktion zum Anzeigen eines Titels
+print_title() {
+    echo -e "\n${BLUE}${BOLD}=== $1 ===${NC}\n"
+}
+
+# Funktion zum Anzeigen eines Schritts
+print_step() {
+    echo -e "\n${YELLOW}${BOLD}▶ $1${NC}"
+}
+
+# Funktion zum Anzeigen einer Erfolgsmeldung
+print_success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
+
+# Funktion zum Anzeigen einer Warnung
+print_warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+# Funktion zum Anzeigen eines Fehlers
+print_error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+# Funktion zum Anzeigen einer Info
+print_info() {
+    echo -e "${BLUE}ℹ $1${NC}"
+}
+
+# Funktion für die Pfeiltasten-Navigation
+select_option() {
+    local prompt="$1"
+    shift
+    local options=("$@")
+    local selected=0
+    local key
+
+    # Verstecke Cursor
+    tput civis
+
+    while true; do
+        # Lösche vorherige Ausgabe
+        tput clear
+        echo -e "${BLUE}${BOLD}$prompt${NC}\n"
+        
+        # Zeige Optionen
+        for i in "${!options[@]}"; do
+            if [ $i -eq $selected ]; then
+                echo -e "${GREEN}${BOLD}➤ ${options[$i]}${NC}"
+            else
+                echo -e "  ${options[$i]}"
+            fi
+        done
+
+        # Lese Tastendruck
+        read -rsn1 key
+        case "$key" in
+            $'\x1B')  # ESC-Sequenz
+                read -rsn2 key
+                case "$key" in
+                    "[A") # Pfeil nach oben
+                        selected=$((selected - 1))
+                        [ $selected -lt 0 ] && selected=$((${#options[@]} - 1))
+                        ;;
+                    "[B") # Pfeil nach unten
+                        selected=$((selected + 1))
+                        [ $selected -ge ${#options[@]} ] && selected=0
+                        ;;
+                esac
+                ;;
+            "") # Enter
+                tput cnorm # Zeige Cursor wieder an
+                return $selected
+                ;;
+        esac
+    done
+}
+
+# Funktion zum gründlichen Zurücksetzen von Kubernetes
+reset_kubernetes() {
+    print_step "Führe gründliches Kubernetes-Reset durch..."
+    
+    # Stoppe alle laufenden Container
+    print_info "Stoppe alle laufenden Container..."
+    sudo crictl ps -a | grep -v CONTAINER | awk '{print $1}' | xargs -r sudo crictl stop
+    sudo crictl ps -a | grep -v CONTAINER | awk '{print $1}' | xargs -r sudo crictl rm
+
+    # Entferne alle Container-Images
+    print_info "Entferne Container-Images..."
+    sudo crictl rmi --prune
+
+    # Stoppe und deaktiviere kubelet
+    print_info "Stoppe kubelet..."
+    sudo systemctl stop kubelet
+    sudo systemctl disable kubelet
+
+    # Führe kubeadm reset aus
+    print_info "Führe kubeadm reset aus..."
+    sudo kubeadm reset -f
+
+    # Entferne Kubernetes-Konfigurationsdateien
+    print_info "Entferne Kubernetes-Konfigurationsdateien..."
+    sudo rm -rf /etc/kubernetes/
+    sudo rm -rf /var/lib/kubelet/
+    sudo rm -rf /var/lib/etcd/
+    sudo rm -rf /var/lib/cni/
+    sudo rm -rf /opt/cni/
+    sudo rm -rf /var/run/kubernetes/
+    sudo rm -rf ~/.kube/
+
+    # Entferne alle iptables-Regeln
+    print_info "Entferne iptables-Regeln..."
+    sudo iptables -F && sudo iptables -t nat -F && sudo iptables -t mangle -F && sudo iptables -X
+
+    # Entferne alle IPVS-Regeln
+    print_info "Entferne IPVS-Regeln..."
+    sudo ipvsadm -C
+
+    # Entferne alle Docker-Container und -Images (falls Docker installiert ist)
+    if command -v docker &> /dev/null; then
+        print_info "Entferne Docker-Container und -Images..."
+        sudo docker stop $(sudo docker ps -aq) 2>/dev/null || true
+        sudo docker rm $(sudo docker ps -aq) 2>/dev/null || true
+        sudo docker rmi $(sudo docker images -q) 2>/dev/null || true
+    fi
+
+    print_success "Kubernetes-Reset abgeschlossen."
+}
 
 # Funktion zum Prüfen ob Kubernetes bereits installiert ist
 check_kubernetes_installed() {
@@ -57,48 +196,94 @@ install_curl_if_missing() {
     fi
 }
 
+# Funktion zum Speichern der Cluster-Informationen
+save_cluster_info() {
+    local join_command="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    echo "=== Kubernetes Cluster Informationen ===" > "$CLUSTER_INFO_FILE"
+    echo "Erstellt am: $timestamp" >> "$CLUSTER_INFO_FILE"
+    echo "" >> "$CLUSTER_INFO_FILE"
+    
+    echo "=== Master Node Informationen ===" >> "$CLUSTER_INFO_FILE"
+    echo "Hostname: $(hostname)" >> "$CLUSTER_INFO_FILE"
+    echo "IP-Adresse: $(hostname -I | awk '{print $1}')" >> "$CLUSTER_INFO_FILE"
+    echo "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR" >> "$CLUSTER_INFO_FILE"
+    echo "" >> "$CLUSTER_INFO_FILE"
+    
+    echo "=== Worker Node Beitrittsbefehl ===" >> "$CLUSTER_INFO_FILE"
+    echo "$join_command" >> "$CLUSTER_INFO_FILE"
+    echo "" >> "$CLUSTER_INFO_FILE"
+    
+    echo "=== Wichtige Befehle ===" >> "$CLUSTER_INFO_FILE"
+    echo "1. Pod-Netzwerk-Addon installieren (z.B. Flannel):" >> "$CLUSTER_INFO_FILE"
+    echo "   kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml" >> "$CLUSTER_INFO_FILE"
+    echo "" >> "$CLUSTER_INFO_FILE"
+    
+    echo "2. Cluster-Status überprüfen:" >> "$CLUSTER_INFO_FILE"
+    echo "   kubectl get nodes" >> "$CLUSTER_INFO_FILE"
+    echo "   kubectl get pods -A" >> "$CLUSTER_INFO_FILE"
+    echo "" >> "$CLUSTER_INFO_FILE"
+    
+    echo "3. Neuen Join-Token generieren (falls der alte abgelaufen ist):" >> "$CLUSTER_INFO_FILE"
+    echo "   sudo kubeadm token create --print-join-command" >> "$CLUSTER_INFO_FILE"
+    echo "" >> "$CLUSTER_INFO_FILE"
+    
+    echo "=== /etc/hosts Konfiguration ===" >> "$CLUSTER_INFO_FILE"
+    echo "Fügen Sie folgende Zeilen in /etc/hosts auf allen Nodes ein:" >> "$CLUSTER_INFO_FILE"
+    echo "$(hostname -I | awk '{print $1}') $(hostname)" >> "$CLUSTER_INFO_FILE"
+    echo "" >> "$CLUSTER_INFO_FILE"
+    
+    echo "=== Wichtige Hinweise ===" >> "$CLUSTER_INFO_FILE"
+    echo "1. Speichern Sie diese Datei sicher auf!" >> "$CLUSTER_INFO_FILE"
+    echo "2. Der Join-Token ist 24 Stunden gültig" >> "$CLUSTER_INFO_FILE"
+    echo "3. Konfigurieren Sie die /etc/hosts auf allen Nodes" >> "$CLUSTER_INFO_FILE"
+    echo "4. Installieren Sie das Pod-Netzwerk-Addon auf dem Master Node" >> "$CLUSTER_INFO_FILE"
+    
+    # Setze Berechtigungen
+    chmod 600 "$CLUSTER_INFO_FILE"
+    
+    echo "Cluster-Informationen wurden in $CLUSTER_INFO_FILE gespeichert."
+}
+
 # --- Hauptskript Start ---
 
-echo "=== Kubernetes Node Setup Skript ==="
+print_title "Kubernetes Node Setup Skript"
+print_info "Dieses Skript hilft Ihnen bei der Einrichtung eines Kubernetes-Nodes."
+print_info "Es führt Sie Schritt für Schritt durch den Prozess."
 
 # Prüfen ob Kubernetes bereits installiert ist
 if check_kubernetes_installed; then
-    echo "Kubernetes ist bereits installiert."
-    
-    # Versuche kubectl Konfiguration einzurichten
-    if ! setup_kubectl_config; then
-        echo "Warnung: kubectl Konfiguration konnte nicht eingerichtet werden."
-    fi
+    print_warning "Kubernetes ist bereits installiert."
     
     # Prüfen ob Node bereits Teil eines Clusters ist
     if check_node_in_cluster; then
-        echo "Dieser Node ist bereits Teil eines Clusters."
-        read -p "Möchten Sie den Node aus dem Cluster entfernen und neu konfigurieren? (j/n): " RESET_CHOICE
-        if [[ $RESET_CHOICE == "j" ]]; then
-            echo "Entferne Node aus dem Cluster..."
-            sudo kubeadm reset -f
-            echo "Node wurde zurückgesetzt."
+        print_warning "Dieser Node ist bereits Teil eines Clusters."
+        select_option "Möchten Sie den Node aus dem Cluster entfernen und neu konfigurieren?" "Ja" "Nein"
+        if [ $? -eq 0 ]; then
+            print_step "Entferne Node aus dem Cluster..."
+            reset_kubernetes
+            print_success "Node wurde zurückgesetzt."
         else
-            echo "Keine Änderungen vorgenommen. Beende Skript."
+            print_info "Keine Änderungen vorgenommen. Beende Skript."
             exit 0
         fi
     else
-        echo "Kubernetes ist installiert, aber der Node ist noch nicht Teil eines Clusters."
-        read -p "Möchten Sie einem bestehenden Cluster beitreten? (j/n): " JOIN_CHOICE
-        if [[ $JOIN_CHOICE == "j" ]]; then
+        print_warning "Kubernetes ist installiert, aber der Node ist noch nicht Teil eines Clusters."
+        select_option "Möchten Sie einem bestehenden Cluster beitreten?" "Ja" "Nein"
+        if [ $? -eq 0 ]; then
             read -p "Bitte geben Sie den kubeadm join Befehl ein: " JOIN_COMMAND
-            echo "Trete dem Cluster bei..."
+            print_step "Trete dem Cluster bei..."
             eval "sudo $JOIN_COMMAND"
             if [ $? -eq 0 ]; then
-                echo "Node wurde erfolgreich dem Cluster hinzugefügt!"
-                # Versuche kubectl Konfiguration einzurichten
+                print_success "Node wurde erfolgreich dem Cluster hinzugefügt!"
                 if ! setup_kubectl_config; then
-                    echo "Warnung: kubectl Konfiguration konnte nicht eingerichtet werden."
-                    echo "Bitte kopieren Sie die Konfigurationsdatei manuell vom Master Node."
+                    print_warning "kubectl Konfiguration konnte nicht eingerichtet werden."
+                    print_info "Bitte kopieren Sie die Konfigurationsdatei manuell vom Master Node."
                 fi
                 exit 0
             else
-                echo "Fehler beim Beitreten des Clusters. Bitte überprüfen Sie den Befehl und versuchen Sie es erneut."
+                print_error "Fehler beim Beitreten des Clusters. Bitte überprüfen Sie den Befehl und versuchen Sie es erneut."
                 exit 1
             fi
         fi
@@ -106,46 +291,42 @@ if check_kubernetes_installed; then
 fi
 
 # 1. Hostname abfragen
+print_step "Hostname konfigurieren"
 read -p "Geben Sie den Hostnamen für diesen Node ein [$DEFAULT_HOSTNAME]: " NODE_HOSTNAME
 NODE_HOSTNAME=${NODE_HOSTNAME:-$DEFAULT_HOSTNAME}
 if [ -z "$NODE_HOSTNAME" ]; then
-    echo "Hostname darf nicht leer sein. Abbruch."
+    print_error "Hostname darf nicht leer sein. Abbruch."
     exit 1
 fi
 sudo hostnamectl set-hostname "$NODE_HOSTNAME"
-echo "Hostname auf '$NODE_HOSTNAME' gesetzt."
+print_success "Hostname auf '$NODE_HOSTNAME' gesetzt."
 
 # 2. Rolle auswählen
-echo "Wählen Sie die Rolle für diesen Node:"
-echo "1) Kubernetes Master Node"
-echo "2) Kubernetes Worker Node"
-read -p "Geben Sie die Nummer Ihrer Wahl ein (1 oder 2) [$DEFAULT_NODE_ROLE]: " NODE_ROLE_CHOICE
-NODE_ROLE_CHOICE=${NODE_ROLE_CHOICE:-$DEFAULT_NODE_ROLE}
+print_step "Node-Rolle auswählen"
+select_option "Wählen Sie die Rolle für diesen Node:" "Kubernetes Master Node" "Kubernetes Worker Node"
+NODE_ROLE_CHOICE=$?
 
 NODE_ROLE=""
 case $NODE_ROLE_CHOICE in
-    1)
+    0)
         NODE_ROLE="master"
-        echo "Rolle: Master Node ausgewählt."
+        print_success "Rolle: Master Node ausgewählt."
         ;;
-    2)
+    1)
         NODE_ROLE="worker"
-        echo "Rolle: Worker Node ausgewählt."
-        ;;
-    *)
-        echo "Ungültige Auswahl. Abbruch."
-        exit 1
+        print_success "Rolle: Worker Node ausgewählt."
         ;;
 esac
 
-# 3. Pod-Netzwerk-CIDR abfragen (nur relevant für Master, aber für Consistency auf allen Nodes abfragen)
+# 3. Pod-Netzwerk-CIDR abfragen
+print_step "Pod-Netzwerk konfigurieren"
 read -p "Geben Sie das Pod-Netzwerk-CIDR ein [$DEFAULT_POD_CIDR]: " POD_NETWORK_CIDR
 POD_NETWORK_CIDR=${POD_NETWORK_CIDR:-$DEFAULT_POD_CIDR}
 if [ -z "$POD_NETWORK_CIDR" ]; then
-    echo "Pod-Netzwerk-CIDR darf nicht leer sein. Abbruch."
+    print_error "Pod-Netzwerk-CIDR darf nicht leer sein. Abbruch."
     exit 1
 fi
-echo "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
+print_success "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
 
 echo ""
 echo "--- System-Vorbereitung ---"
@@ -238,6 +419,19 @@ echo ""
 # --- Master Node spezifische Konfiguration ---
 if [ "$NODE_ROLE" == "master" ]; then
     echo "--- Master Node Konfiguration ---"
+    
+    # Prüfe ob Ports bereits in Verwendung sind
+    if netstat -tuln | grep -q ":6443\|:10259\|:10257\|:10250\|:2379\|:2380"; then
+        echo "Warnung: Einige benötigte Ports sind bereits in Verwendung."
+        read -p "Möchten Sie Kubernetes zurücksetzen und neu initialisieren? (j/n): " RESET_CHOICE
+        if [[ $RESET_CHOICE == "j" ]]; then
+            reset_kubernetes
+        else
+            echo "Abbruch: Ports sind belegt. Bitte beenden Sie die blockierenden Prozesse manuell."
+            exit 1
+        fi
+    fi
+
     echo "Initialisiere Kubernetes Control Plane..."
     sudo kubeadm init --pod-network-cidr="$POD_NETWORK_CIDR"
 
@@ -253,15 +447,17 @@ if [ "$NODE_ROLE" == "master" ]; then
         exit 1
     fi
 
+    # Generiere den Join-Befehl und speichere die Cluster-Informationen
+    JOIN_COMMAND=$(sudo kubeadm token create --print-join-command)
+    save_cluster_info "$JOIN_COMMAND"
+
     echo ""
     echo "--- WICHTIG: Nächste Schritte für den Master Node ---"
     echo "1. Installieren Sie das Pod-Netzwerk-Addon (z.B. Flannel):"
     echo "   kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml"
     echo ""
-    echo "2. Um Worker-Nodes hinzuzufügen, müssen Sie den 'kubeadm join'-Befehl verwenden, der Ihnen nach der Initialisierung des Masters angezeigt wurde."
-    echo "   Wenn Sie ihn verloren haben, können Sie einen neuen generieren mit:"
-    echo "   sudo kubeadm token create --print-join-command"
-    echo "   Führen Sie diesen Befehl dann auf den Worker-Nodes aus."
+    echo "2. Alle wichtigen Informationen wurden in $CLUSTER_INFO_FILE gespeichert."
+    echo "   Bitte bewahren Sie diese Datei sicher auf!"
     echo ""
     echo "3. Überprüfen Sie den Status Ihres Clusters:"
     echo "   kubectl get nodes"
