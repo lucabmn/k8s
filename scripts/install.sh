@@ -179,25 +179,61 @@ setup_kubectl_config() {
         return 1
     fi
 
-    # Prüfe ob admin.conf existiert
-    if [ ! -f "/etc/kubernetes/admin.conf" ]; then
-        print_error "Kubernetes admin.conf nicht gefunden"
-        print_info "Bitte stellen Sie sicher, dass der Master Node korrekt initialisiert wurde"
-        return 1
-    fi
+    if [ "$NODE_ROLE" == "master" ]; then
+        # Prüfe ob admin.conf existiert
+        if [ ! -f "/etc/kubernetes/admin.conf" ]; then
+            print_error "Kubernetes admin.conf nicht gefunden"
+            print_info "Bitte stellen Sie sicher, dass der Master Node korrekt initialisiert wurde"
+            return 1
+        fi
 
-    # Kopiere Konfigurationsdatei
-    sudo cp -i /etc/kubernetes/admin.conf "$HOME/.kube/config"
-    if [ $? -ne 0 ]; then
-        print_error "Konnte Kubernetes Konfiguration nicht kopieren"
-        return 1
-    fi
+        # Kopiere Konfigurationsdatei
+        sudo cp -i /etc/kubernetes/admin.conf "$HOME/.kube/config"
+        if [ $? -ne 0 ]; then
+            print_error "Konnte Kubernetes Konfiguration nicht kopieren"
+            return 1
+        fi
 
-    # Setze Berechtigungen
-    sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-    if [ $? -ne 0 ]; then
-        print_error "Konnte Berechtigungen nicht setzen"
-        return 1
+        # Setze Berechtigungen
+        sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+        if [ $? -ne 0 ]; then
+            print_error "Konnte Berechtigungen nicht setzen"
+            return 1
+        fi
+    else
+        # Für Worker Nodes: Frage nach Master Node IP
+        read -p "Bitte geben Sie die IP-Adresse des Master Nodes ein: " MASTER_IP
+        if [ -z "$MASTER_IP" ]; then
+            print_error "IP-Adresse darf nicht leer sein"
+            return 1
+        fi
+
+        # Erstelle temporäre Konfiguration
+        cat > "$HOME/.kube/config" << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://${MASTER_IP}:6443
+    insecure-skip-tls-verify: true
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: kubernetes-admin
+  name: kubernetes-admin@kubernetes
+current-context: kubernetes-admin@kubernetes
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate-data: ""
+    client-key-data: ""
+EOF
+
+        print_info "Temporäre kubectl Konfiguration erstellt"
+        print_warning "Hinweis: Für volle Funktionalität müssen Sie die Konfigurationsdatei vom Master Node kopieren"
+        print_info "Sie können dies mit folgendem Befehl auf dem Master Node tun:"
+        print_info "scp /etc/kubernetes/admin.conf root@${MASTER_IP}:~/.kube/config"
     fi
 
     # Teste die Konfiguration
@@ -205,8 +241,12 @@ setup_kubectl_config() {
         print_success "kubectl Konfiguration erfolgreich eingerichtet"
         return 0
     else
-        print_error "kubectl Konfiguration konnte nicht verifiziert werden"
-        print_info "Bitte überprüfen Sie die Berechtigungen und die Konfigurationsdatei"
+        print_warning "kubectl Konfiguration konnte nicht verifiziert werden"
+        if [ "$NODE_ROLE" == "worker" ]; then
+            print_info "Dies ist normal für Worker Nodes. Führen Sie kubectl Befehle auf dem Master Node aus."
+        else
+            print_info "Bitte überprüfen Sie die Berechtigungen und die Konfigurationsdatei"
+        fi
         return 1
     fi
 }
@@ -490,6 +530,11 @@ if [ "$NODE_ROLE" == "master" ]; then
     echo ""
     echo "3. Überprüfen Sie den Status Ihres Clusters:"
     echo "   kubectl get nodes"
+    echo ""
+    echo "4. Für Worker Nodes:"
+    echo "   - Kopieren Sie die Konfigurationsdatei mit:"
+    echo "     scp /etc/kubernetes/admin.conf root@<WORKER_IP>:~/.kube/config"
+    echo "   - Oder verwenden Sie den kubeadm join Befehl aus der cluster-info.txt"
 
 elif [ "$NODE_ROLE" == "worker" ]; then
     echo "--- Worker Node Konfiguration ---"
@@ -500,7 +545,12 @@ elif [ "$NODE_ROLE" == "worker" ]; then
     echo "   Beispiel (ersetzen Sie die Platzhalter):"
     echo "   sudo kubeadm join <MASTER_IP>:<MASTER_PORT> --token <YOUR_TOKEN> --discovery-token-ca-cert-hash sha256:<YOUR_HASH>"
     echo ""
-    echo "2. Überprüfen Sie auf dem Master Node, ob dieser Worker erfolgreich beigetreten ist:"
+    echo "2. Nach dem Beitreten:"
+    echo "   - Kopieren Sie die Konfigurationsdatei vom Master Node:"
+    echo "     scp root@<MASTER_IP>:/etc/kubernetes/admin.conf ~/.kube/config"
+    echo "   - Oder verwenden Sie die temporäre Konfiguration, die das Skript erstellt hat"
+    echo ""
+    echo "3. Überprüfen Sie auf dem Master Node, ob dieser Worker erfolgreich beigetreten ist:"
     echo "   kubectl get nodes"
 fi
 
