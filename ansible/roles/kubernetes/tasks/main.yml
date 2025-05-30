@@ -45,6 +45,17 @@
       command: iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
       when: inventory_hostname in groups['master']
       ignore_errors: yes
+
+    - name: Kill any remaining processes using Kubernetes ports
+      shell: |
+        for port in 10250 10257 10259; do
+          pid=$(lsof -ti:$port)
+          if [ ! -z "$pid" ]; then
+            kill -9 $pid
+          fi
+        done
+      when: inventory_hostname in groups['master']
+      ignore_errors: yes
   when: inventory_hostname in groups['master']
 
 - name: Install containerd
@@ -129,7 +140,7 @@
     dest: /var/lib/kubelet/config.yaml
     mode: '0644'
 
-- name: Stop kubelet service before initialization
+- name: Ensure kubelet service is stopped
   systemd:
     name: kubelet
     state: stopped
