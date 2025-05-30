@@ -29,6 +29,20 @@ check_node_in_cluster() {
     fi
 }
 
+# Funktion zum Einrichten der kubectl Konfiguration
+setup_kubectl_config() {
+    echo "Richte kubectl Konfiguration ein..."
+    mkdir -p "$HOME/.kube"
+    if [ -f "/etc/kubernetes/admin.conf" ]; then
+        sudo cp -i /etc/kubernetes/admin.conf "$HOME/.kube/config"
+        sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+        echo "kubectl Konfiguration erfolgreich eingerichtet."
+    else
+        echo "Warnung: /etc/kubernetes/admin.conf nicht gefunden."
+        return 1
+    fi
+}
+
 # Funktion zum Prüfen und Installieren von curl
 install_curl_if_missing() {
     if ! command -v curl &> /dev/null; then
@@ -51,6 +65,11 @@ echo "=== Kubernetes Node Setup Skript ==="
 if check_kubernetes_installed; then
     echo "Kubernetes ist bereits installiert."
     
+    # Versuche kubectl Konfiguration einzurichten
+    if ! setup_kubectl_config; then
+        echo "Warnung: kubectl Konfiguration konnte nicht eingerichtet werden."
+    fi
+    
     # Prüfen ob Node bereits Teil eines Clusters ist
     if check_node_in_cluster; then
         echo "Dieser Node ist bereits Teil eines Clusters."
@@ -72,6 +91,11 @@ if check_kubernetes_installed; then
             eval "sudo $JOIN_COMMAND"
             if [ $? -eq 0 ]; then
                 echo "Node wurde erfolgreich dem Cluster hinzugefügt!"
+                # Versuche kubectl Konfiguration einzurichten
+                if ! setup_kubectl_config; then
+                    echo "Warnung: kubectl Konfiguration konnte nicht eingerichtet werden."
+                    echo "Bitte kopieren Sie die Konfigurationsdatei manuell vom Master Node."
+                fi
                 exit 0
             else
                 echo "Fehler beim Beitreten des Clusters. Bitte überprüfen Sie den Befehl und versuchen Sie es erneut."
@@ -223,11 +247,11 @@ if [ "$NODE_ROLE" == "master" ]; then
         exit 1
     fi
 
-    echo "Konfiguriere kubectl für den Benutzerzugriff..."
-    mkdir -p "$HOME/.kube"
-    sudo cp -i /etc/kubernetes/admin.conf "$HOME/.kube/config"
-    sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-    echo "kubectl konfiguriert."
+    # Richte kubectl Konfiguration ein
+    if ! setup_kubectl_config; then
+        echo "Fehler: kubectl Konfiguration konnte nicht eingerichtet werden."
+        exit 1
+    fi
 
     echo ""
     echo "--- WICHTIG: Nächste Schritte für den Master Node ---"
