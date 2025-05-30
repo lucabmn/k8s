@@ -9,7 +9,7 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Progress tracking
-TOTAL_STEPS=5
+TOTAL_STEPS=6
 CURRENT_STEP=0
 
 # Funktion zum Anzeigen eines Titels
@@ -20,7 +20,23 @@ print_title() {
 # Funktion zum Anzeigen eines Schritts
 print_step() {
     CURRENT_STEP=$((CURRENT_STEP + 1))
-    echo -e "\n${YELLOW}${BOLD}▶ $1 (Schritt $CURRENT_STEP/$TOTAL_STEPS)${NC}"
+    local progress=$((CURRENT_STEP * 100 / TOTAL_STEPS))
+    local bar_length=30
+    local filled=$((progress * bar_length / 100))
+    local empty=$((bar_length - filled))
+    
+    # Progress bar erstellen
+    local bar="["
+    for ((i=0; i<filled; i++)); do
+        bar+="█"
+    done
+    for ((i=0; i<empty; i++)); do
+        bar+="░"
+    done
+    bar+="]"
+    
+    echo -e "\n${YELLOW}${BOLD}▶ $1${NC}"
+    echo -e "${BLUE}${bar} ${progress}% (Schritt $CURRENT_STEP/$TOTAL_STEPS)${NC}"
 }
 
 # Funktion zum Anzeigen einer Erfolgsmeldung
@@ -43,17 +59,54 @@ print_warning() {
     echo -e "${YELLOW}⚠ $1${NC}"
 }
 
-# Funktion für Benutzerauswahl
+# Funktion für Benutzerauswahl mit Pfeiltasten
 select_option() {
     local prompt="$1"
     local option1="$2"
     local option2="$3"
+    local selected=0
     
-    echo -e "${YELLOW}$prompt${NC}"
-    select yn in "$option1" "$option2"; do
-        case $yn in
-            "$option1") return 0;;
-            "$option2") return 1;;
+    # Cursor ausblenden
+    tput civis
+    
+    # Funktion zum Zeichnen des Menüs
+    draw_menu() {
+        echo -e "${YELLOW}$prompt${NC}"
+        if [ $selected -eq 0 ]; then
+            echo -e "${GREEN}${BOLD}▶ $option1${NC}"
+            echo -e "  $option2"
+        else
+            echo -e "  $option1"
+            echo -e "${GREEN}${BOLD}▶ $option2${NC}"
+        fi
+    }
+    
+    # Initiales Menü zeichnen
+    draw_menu
+    
+    # Tastatureingaben verarbeiten
+    while true; do
+        read -rsn1 key
+        case "$key" in
+            $'\x1b')  # ESC sequence
+                read -rsn2 key
+                case "$key" in
+                    "[A")  # Pfeil nach oben
+                        selected=$((selected == 0 ? 1 : 0))
+                        tput cuu1 2  # Cursor 2 Zeilen nach oben
+                        draw_menu
+                        ;;
+                    "[B")  # Pfeil nach unten
+                        selected=$((selected == 0 ? 1 : 0))
+                        tput cuu1 2  # Cursor 2 Zeilen nach oben
+                        draw_menu
+                        ;;
+                esac
+                ;;
+            "")  # Enter
+                tput cnorm  # Cursor wieder einblenden
+                return $selected
+                ;;
         esac
     done
 }
