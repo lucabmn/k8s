@@ -16,7 +16,11 @@ Dieses Projekt automatisiert die Installation und Konfiguration eines Kubernetes
 
 2. **Setup-Skript ausführen:**
    ```bash
+   # Für Linux/Mac:
    sudo ./setup.sh
+   
+   # Für Windows:
+   # Rechtsklick auf setup.bat und "Als Administrator ausführen" wählen
    ```
    Dieses Skript installiert automatisch alle benötigten Voraussetzungen:
    - Python3
@@ -45,10 +49,20 @@ Dieses Projekt automatisiert die Installation und Konfiguration eines Kubernetes
 
 4. **SSH-Zugriff einrichten:**
    ```bash
+   # Für Linux/Mac:
    # SSH-Key auf alle Server kopieren
    ssh-copy-id ubuntu@192.168.1.10  # Master
    ssh-copy-id ubuntu@192.168.1.11  # Worker1
    ssh-copy-id ubuntu@192.168.1.12  # Worker2
+
+   # Für Windows (PowerShell):
+   # 1. SSH-Key generieren (falls noch nicht vorhanden)
+   ssh-keygen -t rsa -b 4096 -f "$env:USERPROFILE\.ssh\id_rsa" -N '""'
+   
+   # 2. SSH-Key auf alle Server kopieren
+   Get-Content "$env:USERPROFILE\.ssh\id_rsa.pub" | ssh root@192.168.178.50 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"  # Master
+   Get-Content "$env:USERPROFILE\.ssh\id_rsa.pub" | ssh root@192.168.178.51 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"  # Worker1
+   Get-Content "$env:USERPROFILE\.ssh\id_rsa.pub" | ssh root@192.168.178.52 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"  # Worker2
    ```
 
 5. **Kubernetes Cluster installieren:**
