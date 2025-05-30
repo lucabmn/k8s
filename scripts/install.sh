@@ -170,14 +170,43 @@ check_node_in_cluster() {
 
 # Funktion zum Einrichten der kubectl Konfiguration
 setup_kubectl_config() {
-    echo "Richte kubectl Konfiguration ein..."
+    print_step "Richte kubectl Konfiguration ein..."
+    
+    # Erstelle .kube Verzeichnis
     mkdir -p "$HOME/.kube"
-    if [ -f "/etc/kubernetes/admin.conf" ]; then
-        sudo cp -i /etc/kubernetes/admin.conf "$HOME/.kube/config"
-        sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
-        echo "kubectl Konfiguration erfolgreich eingerichtet."
+    if [ $? -ne 0 ]; then
+        print_error "Konnte .kube Verzeichnis nicht erstellen"
+        return 1
+    fi
+
+    # Prüfe ob admin.conf existiert
+    if [ ! -f "/etc/kubernetes/admin.conf" ]; then
+        print_error "Kubernetes admin.conf nicht gefunden"
+        print_info "Bitte stellen Sie sicher, dass der Master Node korrekt initialisiert wurde"
+        return 1
+    fi
+
+    # Kopiere Konfigurationsdatei
+    sudo cp -i /etc/kubernetes/admin.conf "$HOME/.kube/config"
+    if [ $? -ne 0 ]; then
+        print_error "Konnte Kubernetes Konfiguration nicht kopieren"
+        return 1
+    fi
+
+    # Setze Berechtigungen
+    sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+    if [ $? -ne 0 ]; then
+        print_error "Konnte Berechtigungen nicht setzen"
+        return 1
+    fi
+
+    # Teste die Konfiguration
+    if kubectl get nodes &> /dev/null; then
+        print_success "kubectl Konfiguration erfolgreich eingerichtet"
+        return 0
     else
-        echo "Warnung: /etc/kubernetes/admin.conf nicht gefunden."
+        print_error "kubectl Konfiguration konnte nicht verifiziert werden"
+        print_info "Bitte überprüfen Sie die Berechtigungen und die Konfigurationsdatei"
         return 1
     fi
 }
