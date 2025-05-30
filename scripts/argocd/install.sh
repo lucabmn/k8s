@@ -3,6 +3,9 @@
 # Exit on error
 set -e
 
+# Default port
+PORT=${1:-8080}
+
 echo "🚀 Starting Argo CD installation..."
 
 # Create namespace
@@ -33,6 +36,10 @@ echo "📝 Important information:"
 echo "   - Argo CD Server: https://$SERVER"
 echo "   - Username: admin"
 echo "   - Password: $INITIAL_PASSWORD"
+echo ""
+echo "🌐 Für den Zugriff über Port-Forwarding:"
+echo "   kubectl port-forward svc/argocd-server -n argocd $PORT:443"
+echo "   Web UI: https://localhost:$PORT"
 echo ""
 echo "⚠️  Please change the admin password after first login using:"
 echo "   argocd account update-password" 

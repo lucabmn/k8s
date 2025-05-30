@@ -13,7 +13,11 @@ Dieses Skript installiert Argo CD auf deinem Kubernetes-Cluster.
 
 1. Skript herunterladen und ausführen:
 ```bash
+# Mit Standard-Port (8080)
 curl -sSL https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/argocd/install.sh | sudo bash
+
+# Mit benutzerdefiniertem Port (z.B. 9090)
+curl -sSL https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/argocd/install.sh | sudo bash 9090
 ```
 
 2. Argo CD CLI installieren:
@@ -40,8 +44,24 @@ argocd account update-password
 
 ## 🌐 Zugriff auf die Web UI
 
-Die Argo CD Web UI ist über den LoadBalancer-Service erreichbar:
+Die Argo CD Web UI kann auf zwei Arten erreicht werden:
+
+### Option 1: Über LoadBalancer (falls verfügbar)
 * URL: https://<ARGOCD_SERVER>
+* Benutzer: admin
+* Passwort: (wird bei der Installation angezeigt)
+
+### Option 2: Über Port-Forwarding (empfohlen für lokale Entwicklung)
+1. Starte Port-Forwarding in einem separaten Terminal:
+```bash
+# Mit Standard-Port (8080)
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# Oder mit benutzerdefiniertem Port (z.B. 9090)
+kubectl port-forward svc/argocd-server -n argocd 9090:443
+```
+2. Öffne die Web UI im Browser:
+* URL: https://localhost:<PORT>
 * Benutzer: admin
 * Passwort: (wird bei der Installation angezeigt)
 
@@ -50,6 +70,7 @@ Die Argo CD Web UI ist über den LoadBalancer-Service erreichbar:
 * **Namespace-Fehler:** Stelle sicher, dass du die nötigen Rechte hast
 * **Pod-Start-Fehler:** Prüfe die Pod-Logs mit `kubectl logs -n argocd`
 * **Zugriffsfehler:** Stelle sicher, dass der LoadBalancer korrekt konfiguriert ist
+* **Port-Forwarding-Fehler:** Stelle sicher, dass der gewählte Port nicht bereits verwendet wird
 
 ## 📚 Weitere Informationen
 
