@@ -6,7 +6,7 @@ Ein einfaches Skript zur Installation und Konfiguration von Kubernetes Nodes.
 
 1. **Skript herunterladen und ausführen:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/lucabmn/k8s/main/scripts/install.sh -o install.sh && chmod +x install.sh && sudo ./install.sh
 ```
 
 2. **Master Node einrichten:**
