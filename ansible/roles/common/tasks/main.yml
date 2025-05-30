@@ -19,11 +19,12 @@
   command: swapoff -a
   changed_when: false
 
-- name: Remove swap from fstab
+- name: Comment out swap entries in fstab
   lineinfile:
     path: /etc/fstab
     regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
-    replace: '# \1'
+    line: '# \1'
+    backrefs: yes
     state: present
 
 - name: Load required kernel modules
