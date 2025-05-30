@@ -8,6 +8,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
+# Progress tracking
+TOTAL_STEPS=5
+CURRENT_STEP=0
+
 # Funktion zum Anzeigen eines Titels
 print_title() {
     echo -e "\n${BLUE}${BOLD}=== $1 ===${NC}\n"
@@ -15,7 +19,8 @@ print_title() {
 
 # Funktion zum Anzeigen eines Schritts
 print_step() {
-    echo -e "\n${YELLOW}${BOLD}▶ $1${NC}"
+    CURRENT_STEP=$((CURRENT_STEP + 1))
+    echo -e "\n${YELLOW}${BOLD}▶ $1 (Schritt $CURRENT_STEP/$TOTAL_STEPS)${NC}"
 }
 
 # Funktion zum Anzeigen einer Erfolgsmeldung
@@ -31,6 +36,26 @@ print_error() {
 # Funktion zum Anzeigen einer Info
 print_info() {
     echo -e "${BLUE}ℹ $1${NC}"
+}
+
+# Funktion zum Anzeigen einer Warnung
+print_warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+# Funktion für Benutzerauswahl
+select_option() {
+    local prompt="$1"
+    local option1="$2"
+    local option2="$3"
+    
+    echo -e "${YELLOW}$prompt${NC}"
+    select yn in "$option1" "$option2"; do
+        case $yn in
+            "$option1") return 0;;
+            "$option2") return 1;;
+        esac
+    done
 }
 
 # Prüfe ob das Skript als root ausgeführt wird
