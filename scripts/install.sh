@@ -4,6 +4,11 @@
 KUBERNETES_VERSION="v1.29" # Kann bei Bedarf geändert werden
 CONTAINERD_VERSION="1.7.13" # Aktuelle containerd Version, kann angepasst werden
 
+# Default Werte
+DEFAULT_HOSTNAME="k8s-master-01"
+DEFAULT_NODE_ROLE="1"
+DEFAULT_POD_CIDR="10.50.0.0/16"
+
 # --- Funktionen ---
 
 # Funktion zum Prüfen und Installieren von curl
@@ -25,7 +30,8 @@ install_curl_if_missing() {
 echo "=== Kubernetes Node Setup Skript ==="
 
 # 1. Hostname abfragen
-read -p "Geben Sie den Hostnamen für diesen Node ein (z.B. k8s-master-01, k8s-worker-01): " NODE_HOSTNAME
+read -p "Geben Sie den Hostnamen für diesen Node ein [$DEFAULT_HOSTNAME]: " NODE_HOSTNAME
+NODE_HOSTNAME=${NODE_HOSTNAME:-$DEFAULT_HOSTNAME}
 if [ -z "$NODE_HOSTNAME" ]; then
     echo "Hostname darf nicht leer sein. Abbruch."
     exit 1
@@ -37,7 +43,8 @@ echo "Hostname auf '$NODE_HOSTNAME' gesetzt."
 echo "Wählen Sie die Rolle für diesen Node:"
 echo "1) Kubernetes Master Node"
 echo "2) Kubernetes Worker Node"
-read -p "Geben Sie die Nummer Ihrer Wahl ein (1 oder 2): " NODE_ROLE_CHOICE
+read -p "Geben Sie die Nummer Ihrer Wahl ein (1 oder 2) [$DEFAULT_NODE_ROLE]: " NODE_ROLE_CHOICE
+NODE_ROLE_CHOICE=${NODE_ROLE_CHOICE:-$DEFAULT_NODE_ROLE}
 
 NODE_ROLE=""
 case $NODE_ROLE_CHOICE in
@@ -56,7 +63,8 @@ case $NODE_ROLE_CHOICE in
 esac
 
 # 3. Pod-Netzwerk-CIDR abfragen (nur relevant für Master, aber für Consistency auf allen Nodes abfragen)
-read -p "Geben Sie das Pod-Netzwerk-CIDR ein (z.B. 10.244.0.0/16 für Flannel): " POD_NETWORK_CIDR
+read -p "Geben Sie das Pod-Netzwerk-CIDR ein [$DEFAULT_POD_CIDR]: " POD_NETWORK_CIDR
+POD_NETWORK_CIDR=${POD_NETWORK_CIDR:-$DEFAULT_POD_CIDR}
 if [ -z "$POD_NETWORK_CIDR" ]; then
     echo "Pod-Netzwerk-CIDR darf nicht leer sein. Abbruch."
     exit 1
@@ -90,18 +98,17 @@ echo "3. containerd installieren und konfigurieren..."
 
 # Add Docker's official GPG key
 sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 # Add Docker repository
 echo \
-  "deb [arch=\"$(dpkg --print-architecture)\" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-  \"$(. /etc/os-release && echo "$VERSION_CODENAME")\" stable" | \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
 
 # Install containerd mit spezifischer Version
-sudo apt install -y "containerd.io=$CONTAINERD_VERSION-1"
+sudo apt install -y containerd.io
 if [ $? -ne 0 ]; then
     echo "Fehler bei der Installation von containerd. Abbruch."
     exit 1
