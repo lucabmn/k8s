@@ -9,7 +9,7 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # Progress tracking
-TOTAL_STEPS=6
+TOTAL_STEPS=5
 CURRENT_STEP=0
 
 # Funktion zum Anzeigen eines Titels
@@ -36,7 +36,7 @@ print_step() {
     bar+="]"
     
     echo -e "\n${YELLOW}${BOLD}▶ $1${NC}"
-    echo -e "${BLUE}${bar} ${progress}% (Schritt $CURRENT_STEP/$TOTAL_STEPS)${NC}"
+    printf "${BLUE}%s %d%% (Schritt %d/%d)${NC}\n" "$bar" "$progress" "$CURRENT_STEP" "$TOTAL_STEPS"
 }
 
 # Funktion zum Anzeigen einer Erfolgsmeldung
@@ -172,6 +172,7 @@ fi
 
 # Ingress Controller installieren
 print_step "Installiere NGINX Ingress Controller..."
+print_info "Dieser Schritt kann einige Minuten dauern..."
 helm install ingress-nginx ingress-nginx/ingress-nginx \
     --namespace ingress-nginx \
     --set controller.service.type=NodePort \
