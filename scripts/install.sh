@@ -315,6 +315,36 @@ save_cluster_info() {
     echo "Cluster-Informationen wurden in $CLUSTER_INFO_FILE gespeichert."
 }
 
+# Funktion zum Vorbereiten des Worker Nodes für kubectl
+prepare_worker_kubectl() {
+    local worker_ip="$1"
+    print_step "Bereite Worker Node für kubectl Konfiguration vor..."
+    
+    # Erstelle .kube Verzeichnis auf dem Worker Node
+    ssh "root@${worker_ip}" "mkdir -p ~/.kube"
+    if [ $? -ne 0 ]; then
+        print_error "Konnte .kube Verzeichnis auf Worker Node nicht erstellen"
+        return 1
+    fi
+    
+    # Kopiere die Konfigurationsdatei
+    scp /etc/kubernetes/admin.conf "root@${worker_ip}:~/.kube/config"
+    if [ $? -ne 0 ]; then
+        print_error "Konnte Konfigurationsdatei nicht kopieren"
+        return 1
+    fi
+    
+    # Setze Berechtigungen
+    ssh "root@${worker_ip}" "chown $(id -u):$(id -g) ~/.kube/config"
+    if [ $? -ne 0 ]; then
+        print_error "Konnte Berechtigungen nicht setzen"
+        return 1
+    fi
+    
+    print_success "Worker Node wurde für kubectl vorbereitet"
+    return 0
+}
+
 # --- Hauptskript Start ---
 
 print_title "Kubernetes Node Setup Skript"
@@ -532,8 +562,11 @@ if [ "$NODE_ROLE" == "master" ]; then
     echo "   kubectl get nodes"
     echo ""
     echo "4. Für Worker Nodes:"
-    echo "   - Kopieren Sie die Konfigurationsdatei mit:"
+    echo "   - Führen Sie auf dem Worker Node den kubeadm join Befehl aus"
+    echo "   - Dann kopieren Sie die Konfigurationsdatei mit:"
+    echo "     ssh root@<WORKER_IP> 'mkdir -p ~/.kube'"
     echo "     scp /etc/kubernetes/admin.conf root@<WORKER_IP>:~/.kube/config"
+    echo "     ssh root@<WORKER_IP> 'chown \$(id -u):\$(id -g) ~/.kube/config'"
     echo "   - Oder verwenden Sie den kubeadm join Befehl aus der cluster-info.txt"
 
 elif [ "$NODE_ROLE" == "worker" ]; then
@@ -546,8 +579,12 @@ elif [ "$NODE_ROLE" == "worker" ]; then
     echo "   sudo kubeadm join <MASTER_IP>:<MASTER_PORT> --token <YOUR_TOKEN> --discovery-token-ca-cert-hash sha256:<YOUR_HASH>"
     echo ""
     echo "2. Nach dem Beitreten:"
+    echo "   - Erstellen Sie das .kube Verzeichnis:"
+    echo "     mkdir -p ~/.kube"
     echo "   - Kopieren Sie die Konfigurationsdatei vom Master Node:"
     echo "     scp root@<MASTER_IP>:/etc/kubernetes/admin.conf ~/.kube/config"
+    echo "   - Setzen Sie die korrekten Berechtigungen:"
+    echo "     chown \$(id -u):\$(id -g) ~/.kube/config"
     echo "   - Oder verwenden Sie die temporäre Konfiguration, die das Skript erstellt hat"
     echo ""
     echo "3. Überprüfen Sie auf dem Master Node, ob dieser Worker erfolgreich beigetreten ist:"
