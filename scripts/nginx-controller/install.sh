@@ -49,6 +49,25 @@ fi
 
 print_title "NGINX Ingress Controller Installation"
 
+# Prüfe ob bereits eine Installation existiert
+print_step "Prüfe auf existierende Installation..."
+if helm list -n ingress-nginx | grep -q "ingress-nginx"; then
+    print_warning "Eine existierende Installation wurde gefunden"
+    select_option "Möchten Sie die existierende Installation entfernen und neu installieren?" "Ja" "Nein"
+    if [ $? -eq 0 ]; then
+        print_step "Entferne existierende Installation..."
+        helm uninstall ingress-nginx --namespace ingress-nginx
+        if [ $? -ne 0 ]; then
+            print_error "Konnte existierende Installation nicht entfernen"
+            exit 1
+        fi
+        print_success "Existierende Installation wurde entfernt"
+    else
+        print_info "Installation abgebrochen"
+        exit 0
+    fi
+fi
+
 # Helm Repository hinzufügen
 print_step "Füge Helm Repository hinzu..."
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
