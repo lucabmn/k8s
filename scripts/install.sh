@@ -5,7 +5,8 @@ KUBERNETES_VERSION="v1.29" # Kann bei Bedarf geändert werden
 CONTAINERD_VERSION="1.7.13" # Aktuelle containerd Version, kann angepasst werden
 
 # Default Werte
-DEFAULT_HOSTNAME=$(hostname) # Aktueller Hostname des Servers
+CURRENT_HOSTNAME=$(hostname 2>/dev/null || echo "k8s-node")
+DEFAULT_HOSTNAME="$CURRENT_HOSTNAME"
 DEFAULT_NODE_ROLE="1"
 DEFAULT_POD_CIDR="10.50.0.0/16"
 CLUSTER_INFO_FILE="cluster-info.txt"
@@ -560,14 +561,6 @@ if [ "$NODE_ROLE" == "master" ]; then
     echo ""
     echo "3. Überprüfen Sie den Status Ihres Clusters:"
     echo "   kubectl get nodes"
-    echo ""
-    echo "4. Für Worker Nodes:"
-    echo "   - Führen Sie auf dem Worker Node den kubeadm join Befehl aus"
-    echo "   - Dann kopieren Sie die Konfigurationsdatei mit:"
-    echo "     ssh root@<WORKER_IP> 'mkdir -p ~/.kube'"
-    echo "     scp /etc/kubernetes/admin.conf root@<WORKER_IP>:~/.kube/config"
-    echo "     ssh root@<WORKER_IP> 'chown \$(id -u):\$(id -g) ~/.kube/config'"
-    echo "   - Oder verwenden Sie den kubeadm join Befehl aus der cluster-info.txt"
 
 elif [ "$NODE_ROLE" == "worker" ]; then
     echo "--- Worker Node Konfiguration ---"
