@@ -346,6 +346,25 @@ prepare_worker_kubectl() {
     return 0
 }
 
+# Funktion zum Anzeigen der Konfiguration und Bestätigung
+show_config_and_confirm() {
+    print_title "Kubernetes Node Konfiguration"
+    print_info "Bitte überprüfen Sie die folgenden Einstellungen:"
+    echo ""
+    echo "Hostname: $NODE_HOSTNAME"
+    echo "IP-Adresse: $(hostname -I | awk '{print $1}')"
+    echo "Rolle: $([ "$NODE_ROLE" == "master" ] && echo "Master Node" || echo "Worker Node")"
+    echo "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
+    echo ""
+    
+    select_option "Sind diese Einstellungen korrekt?" "Ja, Installation starten" "Nein, Einstellungen ändern"
+    if [ $? -eq 1 ]; then
+        print_info "Bitte geben Sie die Einstellungen erneut ein."
+        return 1
+    fi
+    return 0
+}
+
 # --- Hauptskript Start ---
 
 print_title "Kubernetes Node Setup Skript"
@@ -427,6 +446,47 @@ if [ -z "$POD_NETWORK_CIDR" ]; then
     exit 1
 fi
 print_success "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
+
+# Zeige Konfiguration und frage nach Bestätigung
+while ! show_config_and_confirm; do
+    # 1. Hostname abfragen
+    print_step "Hostname konfigurieren"
+    read -p "Geben Sie den Hostnamen für diesen Node ein [$DEFAULT_HOSTNAME]: " NODE_HOSTNAME
+    NODE_HOSTNAME=${NODE_HOSTNAME:-$DEFAULT_HOSTNAME}
+    if [ -z "$NODE_HOSTNAME" ]; then
+        print_error "Hostname darf nicht leer sein. Abbruch."
+        exit 1
+    fi
+    sudo hostnamectl set-hostname "$NODE_HOSTNAME"
+    print_success "Hostname auf '$NODE_HOSTNAME' gesetzt."
+
+    # 2. Rolle auswählen
+    print_step "Node-Rolle auswählen"
+    select_option "Wählen Sie die Rolle für diesen Node:" "Kubernetes Master Node" "Kubernetes Worker Node"
+    NODE_ROLE_CHOICE=$?
+
+    NODE_ROLE=""
+    case $NODE_ROLE_CHOICE in
+        0)
+            NODE_ROLE="master"
+            print_success "Rolle: Master Node ausgewählt."
+            ;;
+        1)
+            NODE_ROLE="worker"
+            print_success "Rolle: Worker Node ausgewählt."
+            ;;
+    esac
+
+    # 3. Pod-Netzwerk-CIDR abfragen
+    print_step "Pod-Netzwerk konfigurieren"
+    read -p "Geben Sie das Pod-Netzwerk-CIDR ein [$DEFAULT_POD_CIDR]: " POD_NETWORK_CIDR
+    POD_NETWORK_CIDR=${POD_NETWORK_CIDR:-$DEFAULT_POD_CIDR}
+    if [ -z "$POD_NETWORK_CIDR" ]; then
+        print_error "Pod-Netzwerk-CIDR darf nicht leer sein. Abbruch."
+        exit 1
+    fi
+    print_success "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
+done
 
 echo ""
 echo "--- System-Vorbereitung ---"
