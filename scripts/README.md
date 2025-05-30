@@ -15,6 +15,7 @@ Willkommen im `scripts/` Verzeichnis! 🎉 Hier findest du unser magisches `inst
     *   [Schritt 6: Cluster Status überprüfen 👀](#schritt-6-cluster-status-überprüfen-)
 *   [💡 Wichtige Hinweise](#-wichtige-hinweise)
 *   [❓ Fehlerbehebung](#-fehlerbehebung)
+*   [🔄 Bestehende Installationen](#-bestehende-installationen)
 
 ## 🌟 Über das Skript
 
@@ -27,6 +28,7 @@ Das `install.sh`-Skript ist dein persönlicher Assistent für die Kubernetes-Nod
 *   Das Hinzufügen der offiziellen Kubernetes-Repositories. 🔗
 *   Die Installation von `kubelet`, `kubeadm` und `kubectl` – und pinnt deren Versionen, damit nichts versehentlich kaputt geht. 🔒
 *   Auf Master-Nodes: Die Initialisierung deiner Kubernetes Control Plane. 🎉
+*   **Neu:** Intelligente Erkennung bestehender Installationen und Cluster-Beitrittsmöglichkeit! 🧠
 
 Das Beste daran? Das Skript ist interaktiv! Es fragt dich nach wichtigen Details wie dem Hostnamen deines Nodes, seiner Rolle (Master oder Worker) und dem Pod-Netzwerk-CIDR. So bleibt alles flexibel und auf deine Bedürfnisse zugeschnitten. 💬
 
@@ -153,3 +155,27 @@ Manchmal läuft nicht alles perfekt – das ist normal! Hier sind ein paar Tipps
     *   Ist dein Pod-Netzwerk-Addon (wie Flannel) richtig installiert und laufen seine Pods? 🤔
     *   Wirf einen Blick in die Logs von `kubelet` auf dem betreffenden Node: `sudo journalctl -u kubelet -f`.
     *   Überprüfe deine Firewall-Regeln (falls vorhanden) und stelle sicher, dass die `/etc/hosts`-Datei auf allen Nodes perfekt ist. 🔥
+
+## 🔄 Bestehende Installationen
+
+Das Skript ist jetzt noch schlauer! Es erkennt automatisch, ob Kubernetes bereits installiert ist und bietet dir verschiedene Optionen:
+
+### Wenn Kubernetes bereits installiert ist:
+
+1. **Node ist bereits Teil eines Clusters:**
+   - Das Skript erkennt dies und bietet dir die Option, den Node aus dem Cluster zu entfernen und neu zu konfigurieren
+   - Wähle "j" für Ja, um den Node zurückzusetzen
+   - Wähle "n" für Nein, um das Skript zu beenden
+
+2. **Node ist noch nicht Teil eines Clusters:**
+   - Das Skript bietet dir die Option, einem bestehenden Cluster beizutreten
+   - Wähle "j" für Ja, um dem Cluster beizutreten
+   - Gib den `kubeadm join`-Befehl ein, den du vom Master Node erhalten hast
+   - Das Skript führt den Join-Befehl aus und meldet den Erfolg oder Fehler
+
+### Vorteile der neuen Funktionalität:
+
+*   Keine doppelte Installation notwendig
+*   Einfaches Beitreten zu bestehenden Clustern
+*   Sichere Zurücksetzung von Nodes bei Bedarf
+*   Bessere Benutzerführung durch interaktive Menüs

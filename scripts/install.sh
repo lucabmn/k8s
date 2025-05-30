@@ -11,6 +11,24 @@ DEFAULT_POD_CIDR="10.50.0.0/16"
 
 # --- Funktionen ---
 
+# Funktion zum Prüfen ob Kubernetes bereits installiert ist
+check_kubernetes_installed() {
+    if command -v kubectl &> /dev/null && command -v kubeadm &> /dev/null && command -v kubelet &> /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Funktion zum Prüfen ob Node bereits Teil eines Clusters ist
+check_node_in_cluster() {
+    if kubectl get nodes &> /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Funktion zum Prüfen und Installieren von curl
 install_curl_if_missing() {
     if ! command -v curl &> /dev/null; then
@@ -28,6 +46,40 @@ install_curl_if_missing() {
 # --- Hauptskript Start ---
 
 echo "=== Kubernetes Node Setup Skript ==="
+
+# Prüfen ob Kubernetes bereits installiert ist
+if check_kubernetes_installed; then
+    echo "Kubernetes ist bereits installiert."
+    
+    # Prüfen ob Node bereits Teil eines Clusters ist
+    if check_node_in_cluster; then
+        echo "Dieser Node ist bereits Teil eines Clusters."
+        read -p "Möchten Sie den Node aus dem Cluster entfernen und neu konfigurieren? (j/n): " RESET_CHOICE
+        if [[ $RESET_CHOICE == "j" ]]; then
+            echo "Entferne Node aus dem Cluster..."
+            sudo kubeadm reset -f
+            echo "Node wurde zurückgesetzt."
+        else
+            echo "Keine Änderungen vorgenommen. Beende Skript."
+            exit 0
+        fi
+    else
+        echo "Kubernetes ist installiert, aber der Node ist noch nicht Teil eines Clusters."
+        read -p "Möchten Sie einem bestehenden Cluster beitreten? (j/n): " JOIN_CHOICE
+        if [[ $JOIN_CHOICE == "j" ]]; then
+            read -p "Bitte geben Sie den kubeadm join Befehl ein: " JOIN_COMMAND
+            echo "Trete dem Cluster bei..."
+            eval "sudo $JOIN_COMMAND"
+            if [ $? -eq 0 ]; then
+                echo "Node wurde erfolgreich dem Cluster hinzugefügt!"
+                exit 0
+            else
+                echo "Fehler beim Beitreten des Clusters. Bitte überprüfen Sie den Befehl und versuchen Sie es erneut."
+                exit 1
+            fi
+        fi
+    fi
+fi
 
 # 1. Hostname abfragen
 read -p "Geben Sie den Hostnamen für diesen Node ein [$DEFAULT_HOSTNAME]: " NODE_HOSTNAME
