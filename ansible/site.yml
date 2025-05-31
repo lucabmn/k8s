@@ -18,4 +18,4 @@
   hosts: worker
   become: true
   roles:
-    - kubernetes 
+    - kubernetes

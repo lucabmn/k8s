@@ -22,6 +22,14 @@ is_package_installed() {
         dpkg -l "$1" &> /dev/null
     elif [ "$OS" = "CentOS Linux" ] || [ "$OS" = "Red Hat Enterprise Linux" ]; then
         rpm -q "$1" &> /dev/null
+    elif [ "$OS" = "macOS" ]; then
+        if [ "$1" = "python3" ]; then
+            command -v python3 &> /dev/null
+        elif [ "$1" = "ansible" ]; then
+            command -v ansible &> /dev/null
+        elif [ "$1" = "openssh-server" ]; then
+            systemsetup -getremotelogin &> /dev/null
+        fi
     fi
     return $?
 }
@@ -29,14 +37,16 @@ is_package_installed() {
 echo -e "${YELLOW}=== Kubernetes Cluster Setup - Voraussetzungen Installation ===${NC}"
 
 # Prüfen, ob wir Root-Rechte haben
-if [ "$EUID" -ne 0 ]; then
+if [ "$(uname)" != "Darwin" ] && [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Bitte führen Sie dieses Skript mit sudo aus:${NC}"
     echo "sudo $0"
     exit 1
 fi
 
 # Betriebssystem erkennen
-if [ -f /etc/os-release ]; then
+if [ "$(uname)" = "Darwin" ]; then
+    OS="macOS"
+elif [ -f /etc/os-release ]; then
     . /etc/os-release
     OS=$NAME
 else
@@ -50,14 +60,18 @@ echo -e "${YELLOW}Betriebssystem erkannt: $OS${NC}"
 echo -e "\n${YELLOW}Prüfe Python3 Installation...${NC}"
 if ! is_package_installed python3; then
     echo "Python3 wird installiert..."
-    if [ "$OS" = "Ubuntu" ] || [ "$OS" = "Debian GNU/Linux" ]; then
+    if [ "$OS" = "macOS" ]; then
+        if ! command -v brew &> /dev/null; then
+            echo "Homebrew wird installiert..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            check_command "Homebrew Installation"
+        fi
+        brew install python3
+    elif [ "$OS" = "Ubuntu" ] || [ "$OS" = "Debian GNU/Linux" ]; then
         apt update
         apt install -y python3 python3-pip
     elif [ "$OS" = "CentOS Linux" ] || [ "$OS" = "Red Hat Enterprise Linux" ]; then
         yum install -y python3 python3-pip
-    else
-        echo -e "${RED}Nicht unterstütztes Betriebssystem${NC}"
-        exit 1
     fi
     check_command "Python3 Installation"
 else
@@ -68,7 +82,9 @@ fi
 echo -e "\n${YELLOW}Prüfe Ansible Installation...${NC}"
 if ! is_package_installed ansible; then
     echo "Ansible wird installiert..."
-    if [ "$OS" = "Ubuntu" ] || [ "$OS" = "Debian GNU/Linux" ]; then
+    if [ "$OS" = "macOS" ]; then
+        brew install ansible
+    elif [ "$OS" = "Ubuntu" ] || [ "$OS" = "Debian GNU/Linux" ]; then
         apt install -y software-properties-common
         apt-add-repository --yes --update ppa:ansible/ansible
         apt install -y ansible
@@ -81,9 +97,17 @@ else
     echo -e "${GREEN}Ansible ist bereits installiert${NC}"
 fi
 
-# SSH Server installieren
+# SSH Server installieren und konfigurieren
 echo -e "\n${YELLOW}Prüfe SSH Server Installation...${NC}"
-if ! is_package_installed openssh-server; then
+if [ "$OS" = "macOS" ]; then
+    if ! systemsetup -getremotelogin | grep -q "On"; then
+        echo "SSH Server wird aktiviert..."
+        systemsetup -setremotelogin on
+        check_command "SSH Server Aktivierung"
+    else
+        echo -e "${GREEN}SSH Server ist bereits aktiviert${NC}"
+    fi
+elif ! is_package_installed openssh-server; then
     echo "SSH Server wird installiert..."
     if [ "$OS" = "Ubuntu" ] || [ "$OS" = "Debian GNU/Linux" ]; then
         apt install -y openssh-server
@@ -97,7 +121,10 @@ fi
 
 # SSH Service starten und aktivieren
 echo -e "\n${YELLOW}Starte SSH Service...${NC}"
-if [ "$OS" = "Ubuntu" ] || [ "$OS" = "Debian GNU/Linux" ]; then
+if [ "$OS" = "macOS" ]; then
+    # SSH ist bereits aktiviert durch systemsetup
+    echo -e "${GREEN}SSH Service ist aktiv${NC}"
+elif [ "$OS" = "Ubuntu" ] || [ "$OS" = "Debian GNU/Linux" ]; then
     systemctl enable ssh
     systemctl start ssh
     check_command "SSH Service Start"
@@ -147,4 +174,4 @@ echo "   ansible-playbook -i inventory/hosts.yml site.yml"
 echo -e "\n${YELLOW}Hinweis:${NC}"
 echo "Stellen Sie sicher, dass Sie von diesem Computer aus per SSH auf alle Server zugreifen können."
 echo "Sie können die Verbindung testen mit:"
-echo "ssh <benutzer>@<server-ip>" 
+echo "ssh <benutzer>@<server-ip>"

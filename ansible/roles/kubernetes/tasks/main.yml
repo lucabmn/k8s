@@ -1,11 +1,18 @@
 ---
 - name: Reset Kubernetes if previously installed (Master only)
   block:
+    - name: Check if kubelet service exists
+      stat:
+        path: /etc/systemd/system/kubelet.service
+      register: kubelet_service
+
     - name: Stop kubelet service
       systemd:
         name: kubelet
         state: stopped
-      when: inventory_hostname in groups['master']
+      when:
+        - inventory_hostname in groups['master']
+        - kubelet_service.stat.exists
 
     - name: Reset kubeadm
       command: kubeadm reset -f
@@ -104,11 +111,14 @@
     name: containerd
     state: restarted
 
-- name: Add Kubernetes apt repository
-  apt_repository:
-    repo: deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /
-    state: present
-    filename: kubernetes
+- name: Remove any existing Kubernetes repository configurations
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/apt/sources.list.d/kubernetes.list
+    - /usr/share/keyrings/kubernetes-apt-keyring.gpg
+    - /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
 - name: Create directory for Kubernetes apt key
   file:
@@ -211,4 +221,4 @@
   when: inventory_hostname in groups['worker']
   retries: 3
   delay: 10
-  until: result is success 
+  until: result is success
