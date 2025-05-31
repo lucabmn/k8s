@@ -10,12 +10,22 @@
   become: true
   roles:
     - kubernetes
-    - helm
-    - nginx-ingress
-    - argocd
 
 - name: Configure Kubernetes worker nodes
   hosts: worker
   become: true
   roles:
     - kubernetes
+
+- name: Install Helm on master nodes
+  hosts: master
+  become: true
+  roles:
+    - helm
+
+- name: Install NGINX Ingress and ArgoCD on master nodes
+  hosts: master
+  become: true
+  roles:
+    - nginx-ingress
+    - argocd

@@ -1,0 +1,191 @@
+---
+- name: Check OS version
+  ansible.builtin.fail:
+    msg: "OS should be Ubuntu 24.04, not {{ ansible_distribution }} {{ ansible_distribution_version }}"
+  when: ansible_distribution != 'Ubuntu' or ansible_distribution_version != '24.04'
+
+- name: Wait for APT lock to be released
+  ansible.builtin.shell: |
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1; do
+      echo "Waiting for other package manager to finish..."
+      sleep 1
+    done
+  register: wait_result
+  changed_when: false
+  retries: 30
+  delay: 10
+  until: wait_result.rc == 0
+
+- name: Update APT packages
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  register: apt_update
+  retries: 5
+  delay: 10
+  until: apt_update is success
+  ignore_errors: true
+
+- name: Check if APT update failed
+  ansible.builtin.fail:
+    msg: "Failed to update APT cache after multiple retries. Please check network connectivity and DNS settings."
+  when: apt_update is failed
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+
+- name: Remove old Docker repository configurations
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/apt/sources.list.d/docker.list
+    - /etc/apt/sources.list.d/docker-ce.list
+    - /etc/apt/keyrings/docker-apt-keyring.asc
+    - /usr/share/keyrings/docker-archive-keyring.gpg
+
+- name: Create Docker keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Add Docker's official GPG key
+  ansible.builtin.shell: |
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  args:
+    creates: /etc/apt/keyrings/docker.gpg
+
+- name: Add Docker's APT repository
+  ansible.builtin.copy:
+    content: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    dest: /etc/apt/sources.list.d/docker.list
+    mode: '0644'
+
+- name: Update APT cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Disable SWAP
+  ansible.builtin.shell: swapoff -a
+
+- name: Disable SWAP in fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: Create Containerd modules file
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/modules-load.d/containerd.conf
+    force: no
+
+- name: Configure modules for Containerd
+  ansible.builtin.blockinfile:
+    path: /etc/modules-load.d/containerd.conf
+    block: |
+      overlay
+      br_netfilter
+
+- name: Create Kubernetes sysctl params file
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/sysctl.d/99-kubernetes-cri.conf
+    force: no
+
+- name: Configure sysctl params for Kubernetes
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.d/99-kubernetes-cri.conf
+    line: "{{ item }}"
+  with_items:
+    - 'net.bridge.bridge-nf-call-iptables  = 1'
+    - 'net.ipv4.ip_forward                 = 1'
+    - 'net.bridge.bridge-nf-call-ip6tables = 1'
+
+- name: Apply sysctl params without reboot
+  ansible.builtin.command: sysctl --system
+
+- name: Add Kubernetes apt-key
+  ansible.builtin.get_url:
+    url: https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    mode: '0644'
+    force: true
+
+- name: Add Kubernetes' APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /"
+    state: present
+    update_cache: yes
+
+- name: Install containerd
+  ansible.builtin.apt:
+    name: containerd
+    state: present
+    update_cache: yes
+
+- name: Create Containerd directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+
+- name: Add Containerd configuration
+  ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
+
+- name: Configure systemd cgroup driver for Containerd
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: '            SystemdCgroup = false'
+    line: '            SystemdCgroup = true'
+
+- name: Enable and restart Containerd service
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+
+- name: Install Kubelet
+  ansible.builtin.apt:
+    name: kubelet=1.29.*
+    state: present
+    update_cache: true
+
+- name: Install Kubeadm
+  ansible.builtin.apt:
+    name: kubeadm=1.29.*
+    state: present
+
+- name: Enable Kubelet service
+  ansible.builtin.service:
+    name: kubelet
+    enabled: yes
+
+- name: Load br_netfilter kernel module
+  ansible.builtin.modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Set bridge-nf-call-iptables
+  ansible.builtin.sysctl:
+    name: net.bridge.bridge-nf-call-iptables
+    value: 1
+
+- name: Set ip_forward
+  ansible.builtin.sysctl:
+    name: net.ipv4.ip_forward
+    value: 1
+
+- name: Install Kubectl (master only)
+  ansible.builtin.apt:
+    name: kubectl=1.29.*
+    state: present
+    force: yes
+  when: inventory_hostname in groups['master']

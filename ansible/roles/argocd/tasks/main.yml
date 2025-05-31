@@ -2,10 +2,20 @@
 - name: Add ArgoCD Helm repository
   command: helm repo add argo https://argoproj.github.io/argo-helm
   changed_when: false
+  tags: argocd
 
 - name: Update Helm repositories
   command: helm repo update
   changed_when: false
+  tags: argocd
+
+- name: Wait for NGINX Ingress Controller to be ready
+  command: kubectl wait --for=condition=available --timeout=300s deployment/ingress-nginx-controller -n ingress-nginx
+  register: wait_nginx
+  retries: 30
+  delay: 10
+  until: wait_nginx.rc == 0
+  tags: argocd
 
 - name: Install ArgoCD
   command: >
@@ -13,14 +23,20 @@
     --namespace argocd
     --create-namespace
     --set server.extraArgs="{--insecure}"
-    --set server.service.type=LoadBalancer
+    --set server.service.type=NodePort
+    --set server.service.nodePort=8080
+    --set server.ingress.enabled=true
+    --set server.ingress.hosts="{argocd.local}"
+    --set server.ingress.annotations."kubernetes\.io/ingress\.class"=nginx
   register: argocd_install
   changed_when: argocd_install.rc == 0
   failed_when: argocd_install.rc != 0 and "already exists" not in argocd_install.stderr
+  tags: argocd
 
 - name: Wait for ArgoCD server to be ready
   command: kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
   register: wait_result
   retries: 30
   delay: 10
-  until: wait_result.rc == 0 
+  until: wait_result.rc == 0
+  tags: argocd
