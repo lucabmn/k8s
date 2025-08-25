@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # --- Variablen ---
-KUBERNETES_VERSION="v1.29" # Kann bei Bedarf geändert werden
-CONTAINERD_VERSION="1.7.13" # Aktuelle containerd Version, kann angepasst werden
+KUBERNETES_VERSION="v1.33" # Kann bei Bedarf geändert werden
+CONTAINERD_VERSION="2.1.4" # Aktuelle containerd Version, kann angepasst werden
 
 # Default Werte
 CURRENT_HOSTNAME=$(hostname 2>/dev/null || echo "k8s-node")
