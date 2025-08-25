@@ -9,6 +9,7 @@ CURRENT_HOSTNAME=$(hostname 2>/dev/null || echo "k8s-node")
 DEFAULT_HOSTNAME="$CURRENT_HOSTNAME"
 DEFAULT_NODE_ROLE="1"
 DEFAULT_POD_CIDR="10.50.0.0/16"
+DEFAULT_CLUSTER_NAME="kubernetes"
 CLUSTER_INFO_FILE="cluster-info.txt"
 
 # Farben für die Ausgabe
@@ -217,13 +218,13 @@ clusters:
 - cluster:
     server: https://${MASTER_IP}:6443
     insecure-skip-tls-verify: true
-  name: kubernetes
+  name: ${CLUSTER_NAME}
 contexts:
 - context:
-    cluster: kubernetes
+    cluster: ${CLUSTER_NAME}
     user: kubernetes-admin
-  name: kubernetes-admin@kubernetes
-current-context: kubernetes-admin@kubernetes
+  name: kubernetes-admin@${CLUSTER_NAME}
+current-context: kubernetes-admin@${CLUSTER_NAME}
 users:
 - name: kubernetes-admin
   user:
@@ -278,6 +279,7 @@ save_cluster_info() {
     echo "=== Master Node Informationen ===" >> "$CLUSTER_INFO_FILE"
     echo "Hostname: $(hostname)" >> "$CLUSTER_INFO_FILE"
     echo "IP-Adresse: $(hostname -I | awk '{print $1}')" >> "$CLUSTER_INFO_FILE"
+    echo "Cluster-Name: $CLUSTER_NAME" >> "$CLUSTER_INFO_FILE"
     echo "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR" >> "$CLUSTER_INFO_FILE"
     echo "" >> "$CLUSTER_INFO_FILE"
     
@@ -355,6 +357,7 @@ show_config_and_confirm() {
     echo "IP-Adresse: $(hostname -I | awk '{print $1}')"
     echo "Rolle: $([ "$NODE_ROLE" == "master" ] && echo "Master Node" || echo "Worker Node")"
     echo "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
+    echo "Cluster-Name: $CLUSTER_NAME"
     echo ""
     
     select_option "Sind diese Einstellungen korrekt?" "Ja, Installation starten" "Nein, Einstellungen ändern"
@@ -447,6 +450,16 @@ if [ -z "$POD_NETWORK_CIDR" ]; then
 fi
 print_success "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
 
+# 4. Cluster-Name abfragen
+print_step "Cluster-Name konfigurieren"
+read -p "Geben Sie den Namen für den Kubernetes Cluster ein [$DEFAULT_CLUSTER_NAME]: " CLUSTER_NAME
+CLUSTER_NAME=${CLUSTER_NAME:-$DEFAULT_CLUSTER_NAME}
+if [ -z "$CLUSTER_NAME" ]; then
+    print_error "Cluster-Name darf nicht leer sein. Abbruch."
+    exit 1
+fi
+print_success "Cluster-Name: $CLUSTER_NAME"
+
 # Zeige Konfiguration und frage nach Bestätigung
 while ! show_config_and_confirm; do
     # 1. Hostname abfragen
@@ -486,6 +499,16 @@ while ! show_config_and_confirm; do
         exit 1
     fi
     print_success "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
+
+    # 4. Cluster-Name abfragen
+    print_step "Cluster-Name konfigurieren"
+    read -p "Geben Sie den Namen für den Kubernetes Cluster ein [$DEFAULT_CLUSTER_NAME]: " CLUSTER_NAME
+    CLUSTER_NAME=${CLUSTER_NAME:-$DEFAULT_CLUSTER_NAME}
+    if [ -z "$CLUSTER_NAME" ]; then
+        print_error "Cluster-Name darf nicht leer sein. Abbruch."
+        exit 1
+    fi
+    print_success "Cluster-Name: $CLUSTER_NAME"
 done
 
 echo ""
