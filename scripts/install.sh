@@ -9,6 +9,11 @@ CURRENT_HOSTNAME=$(hostname 2>/dev/null || echo "k8s-node")
 DEFAULT_HOSTNAME="$CURRENT_HOSTNAME"
 DEFAULT_NODE_ROLE="1"
 DEFAULT_POD_CIDR="10.50.0.0/16"
+DEFAULT_SERVICE_CIDR="10.96.0.0/12"
+DEFAULT_CLUSTER_NAME="my-kubernetes-cluster"
+DEFAULT_DNS_DOMAIN="cluster.local"
+DEFAULT_API_SERVER_ADVERTISE_ADDRESS=""
+DEFAULT_API_SERVER_PORT="6443"
 CLUSTER_INFO_FILE="cluster-info.txt"
 
 # Farben für die Ausgabe
@@ -278,7 +283,12 @@ save_cluster_info() {
     echo "=== Master Node Informationen ===" >> "$CLUSTER_INFO_FILE"
     echo "Hostname: $(hostname)" >> "$CLUSTER_INFO_FILE"
     echo "IP-Adresse: $(hostname -I | awk '{print $1}')" >> "$CLUSTER_INFO_FILE"
+    echo "Cluster-Name: $CLUSTER_NAME" >> "$CLUSTER_INFO_FILE"
     echo "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR" >> "$CLUSTER_INFO_FILE"
+    echo "Service-Netzwerk-CIDR: $SERVICE_CIDR" >> "$CLUSTER_INFO_FILE"
+    echo "DNS-Domain: $DNS_DOMAIN" >> "$CLUSTER_INFO_FILE"
+    echo "API-Server Advertise Address: $API_SERVER_ADVERTISE_ADDRESS" >> "$CLUSTER_INFO_FILE"
+    echo "API-Server Port: $API_SERVER_PORT" >> "$CLUSTER_INFO_FILE"
     echo "" >> "$CLUSTER_INFO_FILE"
     
     echo "=== Worker Node Beitrittsbefehl ===" >> "$CLUSTER_INFO_FILE"
@@ -299,6 +309,11 @@ save_cluster_info() {
     echo "   sudo kubeadm token create --print-join-command" >> "$CLUSTER_INFO_FILE"
     echo "" >> "$CLUSTER_INFO_FILE"
     
+    echo "4. Cluster-Konfiguration anzeigen:" >> "$CLUSTER_INFO_FILE"
+    echo "   kubectl config view" >> "$CLUSTER_INFO_FILE"
+    echo "   kubectl cluster-info" >> "$CLUSTER_INFO_FILE"
+    echo "" >> "$CLUSTER_INFO_FILE"
+    
     echo "=== /etc/hosts Konfiguration ===" >> "$CLUSTER_INFO_FILE"
     echo "Fügen Sie folgende Zeilen in /etc/hosts auf allen Nodes ein:" >> "$CLUSTER_INFO_FILE"
     echo "$(hostname -I | awk '{print $1}') $(hostname)" >> "$CLUSTER_INFO_FILE"
@@ -309,6 +324,7 @@ save_cluster_info() {
     echo "2. Der Join-Token ist 24 Stunden gültig" >> "$CLUSTER_INFO_FILE"
     echo "3. Konfigurieren Sie die /etc/hosts auf allen Nodes" >> "$CLUSTER_INFO_FILE"
     echo "4. Installieren Sie das Pod-Netzwerk-Addon auf dem Master Node" >> "$CLUSTER_INFO_FILE"
+    echo "5. Cluster-Konfigurationsdatei gespeichert unter: $KUBEADM_CONFIG_FILE" >> "$CLUSTER_INFO_FILE"
     
     # Setze Berechtigungen
     chmod 600 "$CLUSTER_INFO_FILE"
@@ -355,6 +371,14 @@ show_config_and_confirm() {
     echo "IP-Adresse: $(hostname -I | awk '{print $1}')"
     echo "Rolle: $([ "$NODE_ROLE" == "master" ] && echo "Master Node" || echo "Worker Node")"
     echo "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
+    
+    if [ "$NODE_ROLE" == "master" ]; then
+        echo "Cluster-Name: $CLUSTER_NAME"
+        echo "Service-Netzwerk-CIDR: $SERVICE_CIDR"
+        echo "DNS-Domain: $DNS_DOMAIN"
+        echo "API-Server Advertise Address: $API_SERVER_ADVERTISE_ADDRESS"
+        echo "API-Server Port: $API_SERVER_PORT"
+    fi
     echo ""
     
     select_option "Sind diese Einstellungen korrekt?" "Ja, Installation starten" "Nein, Einstellungen ändern"
@@ -447,6 +471,57 @@ if [ -z "$POD_NETWORK_CIDR" ]; then
 fi
 print_success "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
 
+# 4. Master Node spezifische Konfiguration
+if [ "$NODE_ROLE" == "master" ]; then
+    print_step "Cluster-Konfiguration (Master Node)"
+    
+    # Cluster-Name
+    read -p "Geben Sie den Namen des Clusters ein [$DEFAULT_CLUSTER_NAME]: " CLUSTER_NAME
+    CLUSTER_NAME=${CLUSTER_NAME:-$DEFAULT_CLUSTER_NAME}
+    if [ -z "$CLUSTER_NAME" ]; then
+        print_error "Cluster-Name darf nicht leer sein. Abbruch."
+        exit 1
+    fi
+    print_success "Cluster-Name: $CLUSTER_NAME"
+    
+    # Service-Netzwerk-CIDR
+    read -p "Geben Sie das Service-Netzwerk-CIDR ein [$DEFAULT_SERVICE_CIDR]: " SERVICE_CIDR
+    SERVICE_CIDR=${SERVICE_CIDR:-$DEFAULT_SERVICE_CIDR}
+    if [ -z "$SERVICE_CIDR" ]; then
+        print_error "Service-Netzwerk-CIDR darf nicht leer sein. Abbruch."
+        exit 1
+    fi
+    print_success "Service-Netzwerk-CIDR: $SERVICE_CIDR"
+    
+    # DNS-Domain
+    read -p "Geben Sie die DNS-Domain ein [$DEFAULT_DNS_DOMAIN]: " DNS_DOMAIN
+    DNS_DOMAIN=${DNS_DOMAIN:-$DEFAULT_DNS_DOMAIN}
+    if [ -z "$DNS_DOMAIN" ]; then
+        print_error "DNS-Domain darf nicht leer sein. Abbruch."
+        exit 1
+    fi
+    print_success "DNS-Domain: $DNS_DOMAIN"
+    
+    # API-Server Advertise Address
+    CURRENT_IP=$(hostname -I | awk '{print $1}')
+    read -p "Geben Sie die API-Server Advertise Address ein [$CURRENT_IP]: " API_SERVER_ADVERTISE_ADDRESS
+    API_SERVER_ADVERTISE_ADDRESS=${API_SERVER_ADVERTISE_ADDRESS:-$CURRENT_IP}
+    if [ -z "$API_SERVER_ADVERTISE_ADDRESS" ]; then
+        print_error "API-Server Advertise Address darf nicht leer sein. Abbruch."
+        exit 1
+    fi
+    print_success "API-Server Advertise Address: $API_SERVER_ADVERTISE_ADDRESS"
+    
+    # API-Server Port
+    read -p "Geben Sie den API-Server Port ein [$DEFAULT_API_SERVER_PORT]: " API_SERVER_PORT
+    API_SERVER_PORT=${API_SERVER_PORT:-$DEFAULT_API_SERVER_PORT}
+    if [ -z "$API_SERVER_PORT" ]; then
+        print_error "API-Server Port darf nicht leer sein. Abbruch."
+        exit 1
+    fi
+    print_success "API-Server Port: $API_SERVER_PORT"
+fi
+
 # Zeige Konfiguration und frage nach Bestätigung
 while ! show_config_and_confirm; do
     # 1. Hostname abfragen
@@ -486,6 +561,57 @@ while ! show_config_and_confirm; do
         exit 1
     fi
     print_success "Pod-Netzwerk-CIDR: $POD_NETWORK_CIDR"
+
+    # 4. Master Node spezifische Konfiguration (wiederholen)
+    if [ "$NODE_ROLE" == "master" ]; then
+        print_step "Cluster-Konfiguration (Master Node)"
+        
+        # Cluster-Name
+        read -p "Geben Sie den Namen des Clusters ein [$DEFAULT_CLUSTER_NAME]: " CLUSTER_NAME
+        CLUSTER_NAME=${CLUSTER_NAME:-$DEFAULT_CLUSTER_NAME}
+        if [ -z "$CLUSTER_NAME" ]; then
+            print_error "Cluster-Name darf nicht leer sein. Abbruch."
+            exit 1
+        fi
+        print_success "Cluster-Name: $CLUSTER_NAME"
+        
+        # Service-Netzwerk-CIDR
+        read -p "Geben Sie das Service-Netzwerk-CIDR ein [$DEFAULT_SERVICE_CIDR]: " SERVICE_CIDR
+        SERVICE_CIDR=${SERVICE_CIDR:-$DEFAULT_SERVICE_CIDR}
+        if [ -z "$SERVICE_CIDR" ]; then
+            print_error "Service-Netzwerk-CIDR darf nicht leer sein. Abbruch."
+            exit 1
+        fi
+        print_success "Service-Netzwerk-CIDR: $SERVICE_CIDR"
+        
+        # DNS-Domain
+        read -p "Geben Sie die DNS-Domain ein [$DEFAULT_DNS_DOMAIN]: " DNS_DOMAIN
+        DNS_DOMAIN=${DNS_DOMAIN:-$DEFAULT_DNS_DOMAIN}
+        if [ -z "$DNS_DOMAIN" ]; then
+            print_error "DNS-Domain darf nicht leer sein. Abbruch."
+            exit 1
+        fi
+        print_success "DNS-Domain: $DNS_DOMAIN"
+        
+        # API-Server Advertise Address
+        CURRENT_IP=$(hostname -I | awk '{print $1}')
+        read -p "Geben Sie die API-Server Advertise Address ein [$CURRENT_IP]: " API_SERVER_ADVERTISE_ADDRESS
+        API_SERVER_ADVERTISE_ADDRESS=${API_SERVER_ADVERTISE_ADDRESS:-$CURRENT_IP}
+        if [ -z "$API_SERVER_ADVERTISE_ADDRESS" ]; then
+            print_error "API-Server Advertise Address darf nicht leer sein. Abbruch."
+            exit 1
+        fi
+        print_success "API-Server Advertise Address: $API_SERVER_ADVERTISE_ADDRESS"
+        
+        # API-Server Port
+        read -p "Geben Sie den API-Server Port ein [$DEFAULT_API_SERVER_PORT]: " API_SERVER_PORT
+        API_SERVER_PORT=${API_SERVER_PORT:-$DEFAULT_API_SERVER_PORT}
+        if [ -z "$API_SERVER_PORT" ]; then
+            print_error "API-Server Port darf nicht leer sein. Abbruch."
+            exit 1
+        fi
+        print_success "API-Server Port: $API_SERVER_PORT"
+    fi
 done
 
 echo ""
@@ -593,7 +719,42 @@ if [ "$NODE_ROLE" == "master" ]; then
     fi
 
     echo "Initialisiere Kubernetes Control Plane..."
-    sudo kubeadm init --pod-network-cidr="$POD_NETWORK_CIDR"
+    
+    # Erstelle kubeadm Konfigurationsdatei
+    KUBEADM_CONFIG_FILE="/tmp/kubeadm-config.yaml"
+    cat > "$KUBEADM_CONFIG_FILE" << EOF
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+nodeRegistration:
+  criSocket: unix:///var/run/containerd/containerd.sock
+  kubeletExtraArgs:
+    cgroup-driver: systemd
+localAPIEndpoint:
+  advertiseAddress: $API_SERVER_ADVERTISE_ADDRESS
+  bindPort: $API_SERVER_PORT
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+clusterName: $CLUSTER_NAME
+kubernetesVersion: $KUBERNETES_VERSION
+networking:
+  podSubnet: $POD_NETWORK_CIDR
+  serviceSubnet: $SERVICE_CIDR
+  dnsDomain: $DNS_DOMAIN
+apiServer:
+  extraArgs:
+    advertise-address: $API_SERVER_ADVERTISE_ADDRESS
+    bind-port: $API_SERVER_PORT
+controllerManager:
+  extraArgs:
+    cluster-name: $CLUSTER_NAME
+scheduler:
+  extraArgs:
+    cluster-name: $CLUSTER_NAME
+EOF
+
+    # Führe kubeadm init mit der Konfigurationsdatei aus
+    sudo kubeadm init --config="$KUBEADM_CONFIG_FILE"
 
     if [ $? -ne 0 ]; then
         echo "Fehler: kubeadm init fehlgeschlagen. Überprüfen Sie die Fehlermeldungen."
