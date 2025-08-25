@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- Variablen ---
-HELM_VERSION="v3.15.2" # Aktuelle Helm-Version, kann bei Bedarf angepasst werden
+HELM_VERSION="v3.18.6" # Aktuelle Helm-Version, kann bei Bedarf angepasst werden
 HELM_INSTALL_DIR="/usr/local/bin" # Wo Helm installiert werden soll
 
 # --- Funktionen ---
